@@ -386,6 +386,7 @@ html[data-theme="bookshelf"] .ftile{background:linear-gradient(180deg,#4a3220,#3
 <div id="app"></div>
 <div class="toasts" id="toasts"></div>
 <input type="file" id="fileInput" multiple accept=".epub,.html,.htm,.pdf,.mobi,.azw3" hidden>
+<input type="file" id="folderInput" webkitdirectory directory multiple hidden>
 
 <script>
 'use strict';
@@ -1069,7 +1070,7 @@ function renderMain() {
   h += `<div class="head"><div><h1>${esc(title)}</h1></div>
     <div class="count">${q ? `${list.length} match${list.length === 1 ? '' : 'es'} for “${esc(q)}”` : `${fmtNum(n)} fic${n === 1 ? '' : 's'}`}</div>
     ${!S.editing && S.canEdit && isFolder ? `<div class="actions"><button class="btn primary" data-act="enable-edit">${icon('edit')} Edit library</button></div>` : ''}
-    ${S.editing && isFolder ? `<div class="actions"><button class="btn" data-act="new-folder">${icon('plus')} New folder</button><button class="btn primary" data-act="upload">${icon('upload')} Upload fics</button></div>` : ''}</div>`;
+    ${S.editing && isFolder ? `<div class="actions"><button class="btn" data-act="new-folder">${icon('plus')} New folder</button><button class="btn" data-act="upload-folder">${icon('folder')} Upload folder</button><button class="btn primary" data-act="upload">${icon('upload')} Upload fics</button></div>` : ''}</div>`;
   if (!q && col) {
     const how = [col.kw.length ? `tagged ${(col.tags || []).slice(0, 3).map(t => '“' + esc(t) + '”').join(', ')}${col.tags.length > 3 ? ' (or similar)' : ''} on AO3` : '',
       { oneshot: 'with just one chapter', long: 'over 100,000 words', short: 'under 10,000 words', complete: 'marked complete', wip: 'still in progress' }[col.rule] || ''].filter(Boolean).join(', or ');
@@ -1261,28 +1262,142 @@ async function newFolder(parent = S.current) {
     S.open.add(parent); buildGroups(); render(); toast(`Created “${it.name}”.`);
   });
 }
+/* ---------- Uploading: files, whole folders, or dropped folders ----------
+   Every fic gets its own Drive folder ("Title - Author") inside the shelf, its EPUB/HTML/PDF copies go in it,
+   category subfolders become shelves, and fics already in the library only get their missing formats. */
+const widOfMeta = m => (m && m.u && (m.u.match(/works\/(\d+)/) || [])[1]) || '';
+const authCompat = (x, y) => !x || !y || /^unknown$/i.test(x) || /^unknown$/i.test(y) || norm(x) === norm(y) || norm(x).includes(norm(y)) || norm(y).includes(norm(x));
+const safeName = s => String(s).replace(/[\/\\:*?"<>|]+/g, '-').replace(/\s+/g, ' ').trim().slice(0, 150);
 async function uploadFiles(fileList, parent = S.current) {
-  const all = [...fileList].filter(f => !isJunk(f.name));
-  const hidden = fileList.length - all.length;
-  const files = all.filter(f => isFic({ name: f.name, mimeType: f.type }));
-  const skipped = all.length - files.length;
-  if (!files.length && hidden && !all.length) { toast(`Skipped ${hidden} hidden Mac system file${hidden === 1 ? '' : 's'} (names starting with “._”). Nothing else to upload.`); return; }
-  if (!files.length) { toast('Only .epub, .html, .pdf, .mobi and .azw3 files can be added.'); return; }
-  const t = toast(`Uploading 0 of ${files.length}…`, { sticky: true });
-  let ok = 0, failed = 0;
-  for (const file of files) {
-    try {
-      const meta = await parseBytes(await file.arrayBuffer(), file.name);
-      const it = await S.store.upload(file, parent, packMeta(meta));
-      S.files.push({ ...it, parent }); ok++;
-    } catch (e) {
-      failed++; console.error(e);
-      if (e.auth) { t.close(); toast('Your session ended.', { sticky: true, action: 'Sign in again', onAction: reauth }); break; }
+  return importEntries([...fileList].map(f => ({ file: f, dirs: f.webkitRelativePath ? f.webkitRelativePath.split('/').slice(0, -1) : [] })), parent);
+}
+async function collectDropped(dt) {
+  const roots = [...(dt.items || [])].map(i => i.kind === 'file' && i.webkitGetAsEntry && i.webkitGetAsEntry()).filter(Boolean);
+  if (!roots.length) return [...dt.files].map(f => ({ file: f, dirs: [] }));
+  const out = [];
+  const readAll = d => new Promise((res, rej) => { const r = d.createReader(), all = []; const step = () => r.readEntries(b => { if (!b.length) res(all); else { all.push(...b); step(); } }, rej); step(); });
+  const fileOf = fe => new Promise((res, rej) => fe.file(res, rej));
+  const walk = async (en, dirs) => {
+    if (en.isFile) out.push({ file: await fileOf(en), dirs });
+    else if (en.isDirectory && !isJunk(en.name) && en.name !== '__MACOSX') for (const c of await readAll(en)) await walk(c, [...dirs, en.name]);
+  };
+  for (const r of roots) await walk(r, []);
+  return out;
+}
+async function importEntries(entries, base = S.current) {
+  const clean = entries.filter(e => !isJunk(e.file.name) && !e.dirs.some(d => isJunk(d) || d === '__MACOSX'));
+  const hidden = entries.length - clean.length;
+  const ents = clean.filter(e => isFic({ name: e.file.name, mimeType: e.file.type }));
+  const unsupported = clean.length - ents.length;
+  if (!ents.length) { toast(hidden && !clean.length ? `Skipped ${hidden} hidden Mac system file${hidden === 1 ? '' : 's'}. Nothing else to upload.` : 'No fics found. Only .epub, .html, .pdf, .mobi and .azw3 files can be added.'); return; }
+  // the chosen folder itself isn't a shelf: what's inside it goes into the shelf you're on
+  if (ents.every(e => e.dirs.length && e.dirs[0] === ents[0].dirs[0])) ents.forEach(e => { e.dirs = e.dirs.slice(1); });
+
+  const t = toast(`Reading 0 of ${ents.length} files…`, { sticky: true });
+  let n = 0, k = 0;
+  const reader = async () => { while (k < ents.length) { const e = ents[k++]; e.fmt = fmtOf({ name: e.file.name }); try { e.meta = READABLE.includes(e.fmt) ? await parseBytes(await e.file.arrayBuffer(), e.file.name) : (({ guess, ...m }) => m)(metaFromName(e.file.name)); } catch { e.meta = metaFromName(e.file.name); } e.meta.t = cleanTitle(e.meta.t, e.meta.a); n++; t.update(`Reading ${n} of ${ents.length} files…`); } };
+  await Promise.all([reader(), reader(), reader(), reader()]);
+
+  // which local folders are a single fic's folder (ignored) vs. categories (become shelves)
+  const dirInfo = new Map();
+  for (const e of ents) for (let i = 0; i <= e.dirs.length; i++) { const key = e.dirs.slice(0, i).join('/'); if (!dirInfo.has(key)) dirInfo.set(key, { titles: new Set(), sub: false }); if (i < e.dirs.length) dirInfo.get(key).sub = true; }
+  for (const e of ents) dirInfo.get(e.dirs.join('/')).titles.add(titleKey(e.meta.t));
+  for (const e of ents) {
+    let cut = e.dirs.length, pid = base;
+    for (let i = 0; i < e.dirs.length; i++) {
+      const name = e.dirs[i], info = dirInfo.get(e.dirs.slice(0, i + 1).join('/'));
+      const shelf = pid && childFolders(pid).find(x => x.name.toLowerCase() === name.toLowerCase());
+      const dk = titleKey(cleanTitle(name)), tk = titleKey(e.meta.t);
+      const looksLikeFic = sameTitle(cleanTitle(name), e.meta.t, true)
+        || (!shelf && !info.sub && info.titles.size === 1 && dk.length >= 3 && tk.length >= 3 && (dk.includes(tk) || tk.includes(dk)));
+      if (looksLikeFic) { cut = i; break; }
+      pid = shelf ? shelf.id : null;
     }
-    t.update(`Uploading ${ok + failed} of ${files.length}…`);
+    e.shelf = e.dirs.slice(0, cut);
+  }
+  // group files into fics (AO3 link first, then same title + compatible author, per shelf)
+  const fics = [];
+  const ordered = ents.slice().sort((a, b) => (widOfMeta(b.meta) ? 1 : 0) - (widOfMeta(a.meta) ? 1 : 0) || richness(b.meta) - richness(a.meta));
+  for (const e of ordered) {
+    const sk = e.shelf.join('/'), w = widOfMeta(e.meta);
+    let f = fics.find(x => x.sk === sk && ((w && x.wid === w) || (sameTitle(x.meta.t, e.meta.t) && authCompat(x.meta.a, e.meta.a) && !(w && x.wid && w !== x.wid))));
+    if (!f) { f = { sk, shelf: e.shelf, wid: w, meta: e.meta, files: [] }; fics.push(f); }
+    if (richness(e.meta) > richness(f.meta)) f.meta = e.meta;
+    if (!f.wid && w) f.wid = w;
+    f.files.push(e);
+  }
+  t.close();
+
+  // plan + confirm
+  const shelfPaths = [...new Set(fics.map(f => f.sk).filter(Boolean))];
+  const findShelf = path => { let pid = base; for (const name of path) { const c = childFolders(pid).find(x => x.name.toLowerCase() === name.toLowerCase()); if (!c) return null; pid = c.id; } return pid; };
+  const newShelves = shelfPaths.filter(p => !findShelf(p.split('/')));
+  const findExisting = (f, shelfId) => shelfId && S.groups.find(g => g.parent === shelfId && ((f.wid && widOfMeta(g.meta) === f.wid) || (sameTitle(g.meta.t, f.meta.t) && authCompat(g.meta.a, f.meta.a))));
+  let already = 0; for (const f of fics) if (findExisting(f, findShelf(f.shelf))) already++;
+  if (fics.length > 1 || newShelves.length) {
+    const byShelf = {}; for (const f of fics) { const k = [folderName(base), ...f.shelf].join(' › '); byShelf[k] = (byShelf[k] || 0) + 1; }
+    const r = await dialog({
+      title: `Add ${fics.length} fic${fics.length === 1 ? '' : 's'}?`, ok: 'Upload',
+      text: `Found <b>${fics.length} fic${fics.length === 1 ? '' : 's'}</b> in ${ents.length} files. Each fic gets its own folder in Drive, with its EPUB/HTML/PDF together.<br><br>`
+        + Object.entries(byShelf).map(([k, v]) => `• ${esc(k)}: ${v}`).join('<br>')
+        + (newShelves.length ? `<br><br>New shelves: ${newShelves.map(p => '<b>' + esc(p.split('/').join(' › ')) + '</b>').join(', ')}` : '')
+        + (already ? `<br><br>${already} already in your library: only missing formats will be added.` : '')
+        + (hidden || unsupported ? `<br><br>Skipping ${[hidden ? hidden + ' hidden Mac file' + (hidden === 1 ? '' : 's') : '', unsupported ? unsupported + ' other file' + (unsupported === 1 ? '' : 's') : ''].filter(Boolean).join(' and ')}.` : '')
+    });
+    if (!r) return;
+  }
+
+  const p = toast('Preparing shelves…', { sticky: true });
+  let added = 0, dup = 0, failed = 0, newFics = 0, done = 0;
+  const total = fics.reduce((s2, f) => s2 + f.files.length, 0);
+  try {
+    // create shelves first, one at a time
+    const shelfId = new Map();
+    for (const path of shelfPaths) {
+      let pid = base;
+      for (const name of path.split('/')) {
+        let c = childFolders(pid).find(x => x.name.toLowerCase() === name.toLowerCase());
+        if (!c) { const it = await S.store.createFolder(name, pid); c = { id: it.id, name: it.name, parent: pid, children: [] }; S.folders.set(c.id, c); S.folders.get(pid).children.push(c.id); }
+        pid = c.id;
+      }
+      shelfId.set(path, pid);
+    }
+    let fi = 0;
+    const worker = async () => {
+      while (fi < fics.length) {
+        const f = fics[fi++]; const sid = f.sk ? shelfId.get(f.sk) : base;
+        const ex = findExisting(f, sid);
+        const have = new Set(ex ? ex.files.map(x => x.fmt) : []);
+        const seen = new Set(), todo = [];
+        for (const e of f.files) { if (have.has(e.fmt) || seen.has(e.fmt)) dup++; else { seen.add(e.fmt); todo.push(e); } }
+        done += f.files.length - todo.length;
+        if (!todo.length) continue;
+        try {
+          let folderId;
+          if (ex) { const ffid = ex.files[0].driveParent; folderId = ffid && ex.files.every(x => x.driveParent === ffid) ? ffid : sid; }
+          else {
+            const name = safeName(f.meta.a ? `${f.meta.t} - ${f.meta.a}` : f.meta.t) || 'Untitled';
+            const it = await S.store.createFolder(name, sid); folderId = it.id;
+            S.ficFolders.set(it.id, { id: it.id, name, parent: sid, children: [], title: f.meta.t }); newFics++;
+          }
+          const meta = { ...f.meta }; delete meta.guess; if (f.wid && !meta.u) meta.u = 'https://archiveofourown.org/works/' + f.wid;
+          for (const e of todo) {
+            try { const it = await S.store.upload(e.file, folderId, packMeta(meta)); S.files.push({ ...it, parent: sid, ...(folderId !== sid ? { driveParent: folderId } : {}) }); added++; }
+            catch (err) { failed++; if (err.auth) throw err; }
+            done++; p.update(`Uploading ${done} of ${total} files…`);
+          }
+        } catch (err) { if (err.auth) { fi = fics.length; throw err; } failed += todo.length; }
+      }
+    };
+    await Promise.all([worker(), worker(), worker()]);
+  } catch (err) {
+    p.close(); buildGroups(); render();
+    if (err.auth) toast('Your session ended partway through.', { sticky: true, action: 'Sign in again', onAction: reauth });
+    else toast('Upload stopped: ' + err.message);
+    return;
   }
   buildGroups(); render();
-  t.done(`Added ${ok} fic${ok === 1 ? '' : 's'} to ${folderName(parent)}${failed ? ` · ${failed} failed` : ''}${skipped ? ` · ${skipped} skipped (unsupported type)` : ''}${hidden ? ` · ${hidden} hidden Mac file${hidden === 1 ? '' : 's'} skipped` : ''}.`);
+  p.done([`Added ${added} file${added === 1 ? '' : 's'}`, newFics ? `${newFics} new fic${newFics === 1 ? '' : 's'}` : '', dup ? `${dup} already there (skipped)` : '', failed ? `${failed} failed` : ''].filter(Boolean).join(' · ') + '.');
 }
 async function editDetails(g) {
   const m = g.meta;
@@ -1543,6 +1658,7 @@ document.addEventListener('click', async e => {
       case 'enable-edit': enableEditing(); break;
       case 'new-folder': newFolder(); break;
       case 'upload': $('#fileInput').click(); break;
+      case 'upload-folder': $('#folderInput').click(); break;
       case 'scan-all': scanAll(); break;
       case 'unresume': { e.stopPropagation(); const fid2 = actEl.dataset.file; const t = S.groupByFile.get(fid2)?.meta.t || 'Fic'; progress.set(fid2, { hidden: true }); renderMain();
         toast(`Removed “${t}” from Continue reading.`, { action: 'Undo', onAction: () => { progress.set(fid2, { hidden: false }); renderMain(); } }); break; }
@@ -1583,11 +1699,12 @@ window.addEventListener('popstate', () => {
   routeFromHash();
 });
 $('#fileInput').addEventListener('change', e => { if (e.target.files.length) uploadFiles(e.target.files); e.target.value = ''; });
+$('#folderInput').addEventListener('change', e => { if (e.target.files.length) uploadFiles(e.target.files); e.target.value = ''; });
 let dragDepth = 0;
-document.addEventListener('dragenter', e => { if (!S.editing || S.reading || !e.dataTransfer.types.includes('Files')) return; e.preventDefault(); if (++dragDepth === 1) { const z = document.createElement('div'); z.className = 'dropzone'; z.id = 'dropzone'; z.textContent = `Drop to add to ${folderName(S.current)}`; document.body.appendChild(z); } });
+document.addEventListener('dragenter', e => { if (!S.editing || S.reading || !e.dataTransfer.types.includes('Files')) return; e.preventDefault(); if (++dragDepth === 1) { const z = document.createElement('div'); z.className = 'dropzone'; z.id = 'dropzone'; z.textContent = `Drop fics or folders to add to ${folderName(S.current)}`; document.body.appendChild(z); } });
 document.addEventListener('dragleave', () => { if (dragDepth && --dragDepth === 0) $('#dropzone')?.remove(); });
 document.addEventListener('dragover', e => { if (S.editing && e.dataTransfer.types.includes('Files')) e.preventDefault(); });
-document.addEventListener('drop', e => { if (!S.editing) return; e.preventDefault(); dragDepth = 0; $('#dropzone')?.remove(); if (e.dataTransfer.files.length) uploadFiles(e.dataTransfer.files); });
+document.addEventListener('drop', e => { if (!S.editing) return; e.preventDefault(); dragDepth = 0; $('#dropzone')?.remove(); const dt = e.dataTransfer; const target = S.current; collectDropped(dt).then(list => { if (list.length) importEntries(list, target); }); });
 
 /* =================================================================
    SIGN-IN SCREENS + BOOT
