@@ -220,7 +220,13 @@ button.chip:hover{outline:1px solid var(--accent)}
 .rcard .mini{width:30px;height:44px;border-radius:3px;background:var(--spine);flex:none;box-shadow:inset -3px 0 0 rgba(0,0,0,.18)}
 .rcard b{display:block;font-family:var(--font-display);font-size:1.05rem;line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .rcard small{color:var(--muted);font-size:.8em}
-.rcard div{min-width:0}
+.rcard div{min-width:0;flex:1}
+.rcard{position:relative}
+.rx{position:absolute;top:6px;right:6px;width:26px;height:26px;border-radius:50%;border:0;background:var(--chip);color:var(--muted);display:grid;place-items:center;padding:0;opacity:.6;transition:opacity .15s,color .15s}
+.rx .i{width:14px;height:14px}
+.rcard:hover .rx,.rcard:focus-within .rx{opacity:1}
+.rx:hover{color:var(--danger)}
+@media (hover:none){.rx{opacity:1}}
 
 /* ---------------- BOOKSHELF LAYOUT ---------------- */
 html[data-theme="bookshelf"] .grid{display:flex;flex-wrap:wrap;align-items:flex-end;gap:0 5px;padding:0 18px;background-image:linear-gradient(to bottom,transparent 250px,#7a5230 250px,#5a3a20 258px,#3b2614 266px,rgba(0,0,0,.35) 266px,transparent 278px);background-size:100% 284px;border-radius:6px}
@@ -963,10 +969,10 @@ function renderMain() {
 
   if (isFolder && atRoot) {
     const prog = progress.all();
-    const recent = Object.entries(prog).filter(([id]) => S.groupByFile.has(id)).sort((a, b) => b[1].at - a[1].at).slice(0, 4);
+    const recent = Object.entries(prog).filter(([id, p]) => S.groupByFile.has(id) && !p.hidden).sort((a, b) => b[1].at - a[1].at).slice(0, 4);
     if (recent.length) h += `<div class="section-h">Continue reading</div><div class="resume">${recent.map(([id, p]) => {
       const g = S.groupByFile.get(id), m = g.meta, hh = hash((m.t || '') + (m.a || ''));
-      return `<button class="rcard" data-resume="${esc(id)}" style="--spine:${SPINES[hh % SPINES.length]}"><span class="mini"></span><div><b>${esc(m.t)}</b><small>${esc(p.label || 'Pick up where you left off')}</small></div></button>`;
+      return `<div class="rcard" role="button" tabindex="0" data-resume="${esc(id)}" style="--spine:${SPINES[hh % SPINES.length]}"><span class="mini"></span><div><b>${esc(m.t)}</b><small>${esc(p.label || 'Pick up where you left off')}</small></div><button class="rx" data-act="unresume" data-file="${esc(id)}" aria-label="Remove from Continue reading" title="Remove from Continue reading">${icon('x')}</button></div>`;
     }).join('')}</div>`;
   }
   if (isFolder && (subs.length || S.editing)) {
@@ -1310,7 +1316,7 @@ async function openReader(fileId) {
     if (!S.reading || S.reading.fileId !== fileId) return;
     if (f.fmt === 'epub' && !S.store.isSample(fileId)) await openEpub(buf, fileId);
     else openHtml(new TextDecoder().decode(buf), fileId);
-    progress.set(fileId, {});
+    progress.set(fileId, { hidden: false });
   } catch (e) {
     console.error(e);
     $('#rBody').innerHTML = `<div class="r-msg"><p>Couldn’t open this fic.</p><p style="opacity:.7">${esc(e.message)}</p><button class="btn" data-act="download" data-file="${fileId}">${icon('download')} Download instead</button></div>`;
@@ -1426,6 +1432,8 @@ document.addEventListener('click', async e => {
       case 'new-folder': newFolder(); break;
       case 'upload': $('#fileInput').click(); break;
       case 'scan-all': scanAll(); break;
+      case 'unresume': { e.stopPropagation(); const fid2 = actEl.dataset.file; const t = S.groupByFile.get(fid2)?.meta.t || 'Fic'; progress.set(fid2, { hidden: true }); renderMain();
+        toast(`Removed “${t}” from Continue reading.`, { action: 'Undo', onAction: () => { progress.set(fid2, { hidden: false }); renderMain(); } }); break; }
       case 'clean-junk': cleanJunk(); break;
       case 'close-modal': closeOverlay(); break;
       case 'read': openReader(fid); break;
@@ -1453,7 +1461,7 @@ document.addEventListener('click', async e => {
 });
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') { if ($('#overlay')) closeOverlay(); else if (S.reading) closeReaderNav(); else document.body.classList.remove('nav-open'); }
-  if ((e.key === 'Enter' || e.key === ' ') && e.target.matches && e.target.matches('.card,.ftile[data-folder],.ftile[data-col]') && !$('#overlay')) { e.preventDefault(); e.target.click(); }
+  if ((e.key === 'Enter' || e.key === ' ') && e.target.matches && e.target.matches('.card,.ftile[data-folder],.ftile[data-col],.rcard') && !$('#overlay')) { e.preventDefault(); e.target.click(); }
   if (S.rend && !$('#overlay')) { if (e.key === 'ArrowLeft') S.rend.prev(); if (e.key === 'ArrowRight') S.rend.next(); }
   if (e.key === '/' && !S.reading && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA' && $('#q')) { e.preventDefault(); $('#q').focus(); }
 });
