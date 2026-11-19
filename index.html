@@ -22,22 +22,70 @@ const CONFIG = {
      A fic can be in many collections at once. Add, rename or delete these freely.
        tags:    words to look for in the AO3 tags (any one is enough)
        exclude: tags to ignore (e.g. "Dark Lord" shouldn't count as a dark fic)
-       rule:    'oneshot' (1 chapter) · 'long' (100k+ words) · 'short' (under 10k) · 'complete' · 'wip'  */
+       rule:    'oneshot' (1 chapter) · 'long' (100k+ words) · 'short' (under 10k) · 'complete' · 'wip'
+       group:   which heading it sits under in the sidebar  */
   collections: [
-    { name: 'Voldemort Wins',    tags: ['Voldemort Wins', 'Voldemort Won', 'Dark Lord Wins', 'Death Eaters Win'] },
-    { name: 'Love Triangle',     tags: ['Love Triangle', 'Love Triangles'] },
-    { name: 'Dark',              tags: ['Dark', 'Dark Fic', 'Dark Themes', 'Dark Hermione Granger', 'Dark Draco Malfoy', 'Dark Romance'],
-                                 exclude: ['Dark Lord', 'Dark Mark', 'Dark Arts', 'Dark Magic', 'Dark Lord Voldemort'] },
-    { name: 'Healer Hermione',   tags: ['Healer Hermione', 'Healer!Hermione', 'Healer Hermione Granger', 'Hermione Granger is a Healer'] },
-    { name: 'Morally Grey',      tags: ['Morally Grey', 'Morally Gray', 'Morally Grey Draco Malfoy', 'Morally Grey Hermione Granger', 'Morally Ambiguous'] },
-    { name: 'Slow Burn',         tags: ['Slow Burn', 'Slowest of Slow Burns', 'Very Slow Burn'] },
-    { name: 'One Shot',          tags: ['One Shot', 'Oneshot', 'One-Shot'], rule: 'oneshot' },
-    { name: 'Enemies to Lovers', tags: ['Enemies to Lovers', 'Enemies to Friends to Lovers', 'Rivals to Lovers'] },
-    { name: 'Arranged Marriage', tags: ['Arranged Marriage', 'Marriage Law', 'Forced Marriage', 'Marriage of Convenience'] },
-    { name: 'Time Travel',       tags: ['Time Travel', 'Time Turners', 'Time Loop'] },
-    { name: 'Long Fics (100k+)', rule: 'long' },
-    { name: 'Works in Progress', rule: 'wip' }
-  ]
+    // ---- Tropes
+    { group: 'Tropes', name: 'Enemies to Lovers',   tags: ['Enemies to Lovers', 'Enemies to Friends to Lovers', 'Rivals to Lovers', 'Hate to Love'] },
+    { group: 'Tropes', name: 'Friends to Lovers',   tags: ['Friends to Lovers', 'Best Friends to Lovers'] },
+    { group: 'Tropes', name: 'Slow Burn',           tags: ['Slow Burn', 'Slowest of Slow Burns', 'Very Slow Burn'] },
+    { group: 'Tropes', name: 'Mutual Pining',       tags: ['Mutual Pining', 'Pining', 'Unrequited Love', 'Unrequited Crush'] },
+    { group: 'Tropes', name: 'Love Triangle',       tags: ['Love Triangle', 'Love Triangles'] },
+    { group: 'Tropes', name: 'Arranged Marriage',   tags: ['Arranged Marriage', 'Marriage Law', 'Forced Marriage', 'Marriage of Convenience'] },
+    { group: 'Tropes', name: 'Fake Dating',         tags: ['Fake/Pretend Relationship', 'Fake Relationship', 'Fake Dating', 'Fake Marriage'] },
+    { group: 'Tropes', name: 'Forced Proximity',    tags: ['Forced Proximity', 'Only One Bed', 'Stuck Together', 'Trapped Together'] },
+    { group: 'Tropes', name: 'Secret Relationship', tags: ['Secret Relationship', 'Secret Dating', 'Hidden Relationship', 'Forbidden Love', 'Forbidden Relationship'] },
+    { group: 'Tropes', name: 'Soulmates & Bonds',   tags: ['Soulmates', 'Soulmate AU', 'Soulmate-Identifying Marks', 'Magical Bond', 'Bonding', 'Life Debt'] },
+    { group: 'Tropes', name: 'Second Chances',      tags: ['Second Chances', 'Second Chance Romance', 'Exes to Lovers', 'Getting Back Together'] },
+    { group: 'Tropes', name: 'Hurt/Comfort',        tags: ['Hurt/Comfort', 'Comfort', 'Caretaking'] },
+    { group: 'Tropes', name: 'Amnesia',             tags: ['Amnesia', 'Memory Loss', 'Obliviation', 'Memory Charms'] },
+    { group: 'Tropes', name: 'Pregnancy & Kids',    tags: ['Pregnancy', 'Unplanned Pregnancy', 'Secret Child', 'Single Parent', 'Parenthood', 'Kid Fic'] },
+    { group: 'Tropes', name: 'Age Gap',             tags: ['Age Difference', 'Age Gap', 'Older Man/Younger Woman'] },
+    { group: 'Tropes', name: 'Redemption',          tags: ['Redemption', 'Draco Malfoy Redemption', 'Redemption Arc'] },
+
+    // ---- Settings & alternate universes
+    { group: 'Settings & AUs', name: 'Voldemort Wins',  tags: ['Voldemort Wins', 'Voldemort Won', 'Dark Lord Wins', 'Death Eaters Win'] },
+    { group: 'Settings & AUs', name: 'Time Travel',     tags: ['Time Travel', 'Time Turners', 'Time Loop'] },
+    { group: 'Settings & AUs', name: 'Eighth Year',     tags: ['Hogwarts Eighth Year', 'Eighth Year', 'Hogwarts 8th Year', 'Head Boy Draco Malfoy', 'Head Girl Hermione Granger'] },
+    { group: 'Settings & AUs', name: 'Muggle / Modern AU', tags: ['Alternate Universe - Muggle', 'Alternate Universe - Modern Setting', 'Alternate Universe - No Magic', 'Alternate Universe - No Powers', 'Muggle AU', 'Modern AU'] },
+    { group: 'Settings & AUs', name: 'Office & Workplace', tags: ['Alternate Universe - Office', 'Office Romance', 'Workplace Relationship', 'Ministry of Magic', 'Coworkers'] },
+    { group: 'Settings & AUs', name: 'Coffee Shop AU',  tags: ['Alternate Universe - Coffee Shops & Cafés', 'Coffee Shop AU', 'Bookshop AU', 'Alternate Universe - Bookstore'] },
+    { group: 'Settings & AUs', name: 'Royalty AU',      tags: ['Alternate Universe - Royalty', 'Royalty AU', 'Prince Draco Malfoy', 'Princess Hermione Granger'] },
+    { group: 'Settings & AUs', name: 'Mafia & Crime AU', tags: ['Alternate Universe - Mafia', 'Mafia AU', 'Alternate Universe - Organized Crime', 'Crime Boss'] },
+    { group: 'Settings & AUs', name: 'Creatures',       tags: ['Veela', 'Veela Draco Malfoy', 'Vampires', 'Werewolves', 'Creature Fic', 'Creature Inheritance'] },
+    { group: 'Settings & AUs', name: 'Pureblood Culture', tags: ['Pureblood Culture', 'Pureblood Traditions', 'Pureblood Politics', 'Malfoy Manor'] },
+    { group: 'Settings & AUs', name: 'Holidays',        tags: ['Christmas', 'Yule', 'Holidays', 'Halloween', 'Valentine\'s Day', 'New Year\'s Eve', 'Fluffmas'] },
+
+    // ---- Characters & roles
+    { group: 'Characters & roles', name: 'Healer Hermione',  tags: ['Healer Hermione', 'Healer!Hermione', 'Healer Hermione Granger', 'Hermione Granger is a Healer'] },
+    { group: 'Characters & roles', name: 'Unspeakables',     tags: ['Unspeakable Hermione Granger', 'Unspeakable Draco Malfoy', 'Unspeakables', 'Department of Mysteries'] },
+    { group: 'Characters & roles', name: 'Aurors',           tags: ['Auror Draco Malfoy', 'Auror Hermione Granger', 'Auror Partners', 'Aurors'] },
+    { group: 'Characters & roles', name: 'Death Eater Draco', tags: ['Death Eater Draco Malfoy', 'Death Eater Draco', 'Dark Draco Malfoy'] },
+    { group: 'Characters & roles', name: 'Dark Hermione',    tags: ['Dark Hermione Granger', 'Dark Hermione', 'Slytherin Hermione Granger'] },
+    { group: 'Characters & roles', name: 'Morally Grey',     tags: ['Morally Grey', 'Morally Gray', 'Morally Grey Draco Malfoy', 'Morally Grey Hermione Granger', 'Morally Ambiguous'] },
+    { group: 'Characters & roles', name: 'Possessive',       tags: ['Possessive Draco Malfoy', 'Possessive Behavior', 'Jealous Draco Malfoy', 'Jealousy'] },
+
+    // ---- Mood
+    { group: 'Mood', name: 'Dark',            tags: ['Dark', 'Dark Fic', 'Dark Themes', 'Dark Romance', 'Psychological Horror'],
+                                              exclude: ['Dark Lord', 'Dark Mark', 'Dark Arts', 'Dark Magic', 'Dark Lord Voldemort', 'Dark Draco Malfoy', 'Dark Hermione Granger'] },
+    { group: 'Mood', name: 'Angst',           tags: ['Angst', 'Heavy Angst', 'Angst and Tragedy', 'Grief/Mourning', 'Grief'] },
+    { group: 'Mood', name: 'Fluff',           tags: ['Fluff', 'Tooth-Rotting Fluff', 'Domestic Fluff', 'Fluff and Humor', 'Fluff and Angst'] },
+    { group: 'Mood', name: 'Humor',           tags: ['Humor', 'Crack', 'Crack Treated Seriously', 'Banter'] },
+    { group: 'Mood', name: 'Happy Ending',    tags: ['Happy Ending', 'Angst with a Happy Ending', 'Hopeful Ending'] },
+    { group: 'Mood', name: 'Sad Ending',      tags: ['Sad Ending', 'Bittersweet Ending', 'Major Character Death', 'Tragedy'] },
+    { group: 'Mood', name: 'Smut',            tags: ['Smut', 'Explicit Sexual Content', 'PWP', 'Porn With Plot', 'Plot What Plot/Porn Without Plot'] },
+
+    // ---- Length & status
+    { group: 'Length & status', name: 'One Shot',          tags: ['One Shot', 'Oneshot', 'One-Shot'], rule: 'oneshot' },
+    { group: 'Length & status', name: 'Short (under 10k)', rule: 'short' },
+    { group: 'Length & status', name: 'Long Fics (100k+)', rule: 'long' },
+    { group: 'Length & status', name: 'Complete',          rule: 'complete' },
+    { group: 'Length & status', name: 'Works in Progress', rule: 'wip' }
+  ],
+
+  /* Any other AO3 tag used on at least this many of your fics gets its own entry
+     under "From your AO3 tags" in the sidebar. Set to 0 to turn this off. */
+  autoTagMin: 3
 };
 // Accept a bare ID, "folders/ID", or a full Drive link.
 CONFIG.clientId = String(CONFIG.clientId || '').trim();
@@ -206,10 +254,13 @@ button.chip:hover{outline:1px solid var(--accent)}
 .empty b{display:block;font-family:var(--font-display);font-size:1.4rem;color:var(--ink);margin-bottom:.3em;font-weight:600}
 
 .node.dim{opacity:.45}
+.side-sub{font-size:.68em;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);margin:12px .6em 4px;opacity:.8}
 .ftile[data-col] b{white-space:normal;line-height:1.2}
 .ftile[data-col]{padding:12px 14px}
 .col-note{display:flex;gap:.5em;align-items:flex-start;color:var(--muted);font-size:.92em;margin:-8px 0 18px}
 .col-note .i{color:var(--accent);margin-top:.15em}
+.tile-sub{font-size:.75em;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);margin:16px 0 8px}
+.tile-sub:first-of-type{margin-top:0}
 .cloud{display:flex;flex-wrap:wrap;gap:7px}
 .chip.big{font-size:.84em;padding:.35em .8em}
 .chip.big span{opacity:.6;margin-left:.2em;font-size:.9em}
@@ -357,7 +408,7 @@ const SPINES = ['#7a2e2e', '#2f4a3a', '#2b3d5c', '#5c3b2b', '#6b5a2b', '#3d2b4f'
 const RLABEL = { g: 'G', t: 'T', m: 'M', e: 'E', n: '?' };
 const RNAME = { g: 'General', t: 'Teen', m: 'Mature', e: 'Explicit', n: 'Not Rated' };
 const READABLE = ['epub', 'html'];
-const COLS = (CONFIG.collections || []).map(c => ({ ...c, slug: String(c.name).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''), kw: (c.tags || []).map(t => String(t).toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()), ex: (c.exclude || []).map(t => String(t).toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()) }));
+const COLS = (CONFIG.collections || []).map(c => ({ ...c, group: c.group || 'Collections', slug: String(c.name).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''), kw: (c.tags || []).map(t => String(t).toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()), ex: (c.exclude || []).map(t => String(t).toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()) }));
 
 /* ---------- reader libraries load only when first needed ---------- */
 const loadScript = src => new Promise((res, rej) => { const s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = () => rej(new Error('Couldn’t load ' + src.split('/').pop())); document.head.appendChild(s); });
@@ -419,7 +470,7 @@ const icon = (n, cls = '') => `<svg class="i ${cls}" viewBox="0 0 24 24" aria-hi
 const S = {
   store: null, user: null, root: null,
   folders: new Map(), files: [], junk: [], ficFolders: new Map(), groups: [], groupByKey: new Map(), groupByFile: new Map(), counts: new Map(),
-  current: null, view: { type: 'folder' }, colCounts: new Map(), topTags: [], query: '', sort: 'added', rating: 'all', ship: 'all', shipOpts: [], fmt: 'all', includeSub: true,
+  current: null, view: { type: 'folder' }, colCounts: new Map(), topTags: [], autoTags: [], query: '', sort: 'added', rating: 'all', ship: 'all', shipOpts: [], fmt: 'all', includeSub: true,
   canEdit: false, editing: false, open: new Set(),
   metaCache: ls.get('fanlib:meta', {}), prefs: {}, reading: null, book: null, rend: null, toc: []
 };
@@ -843,7 +894,10 @@ function buildGroups() {
   S.colCounts = new Map(COLS.map(c => [c.slug, S.groups.filter(g => inCol(g, c)).length]));
   const tc = new Map();
   for (const g of S.groups) for (const t of new Set(g.meta.g || [])) { const k = norm(t); if (!k) continue; const e = tc.get(k) || { tag: t, n: 0 }; e.n++; tc.set(k, e); }
-  S.topTags = [...tc.values()].filter(e => e.n > 1 || S.groups.length < 20).sort((a, b) => b.n - a.n || a.tag.localeCompare(b.tag)).slice(0, 30);
+  const covered = t => { const k = ' ' + norm(t) + ' '; return COLS.some(c => c.kw.some(w => k.includes(' ' + w + ' '))); };
+  const minN = +CONFIG.autoTagMin || 0;
+  S.autoTags = minN ? [...tc.values()].filter(e => e.n >= minN && !covered(e.tag)).sort((a, b) => b.n - a.n || a.tag.localeCompare(b.tag)).slice(0, 40) : [];
+  S.topTags = [...tc.values()].filter(e => !covered(e.tag)).sort((a, b) => b.n - a.n || a.tag.localeCompare(b.tag)).slice(0, 30);
 }
 function tagsOf(g) { if (!g.tagset) { const m = g.meta; g.tagset = [...(m.g || []), ...(m.cat || []), ...(m.wr || [])].map(t => ' ' + norm(t) + ' '); } return g.tagset; }
 function inCol(g, c) {
@@ -928,7 +982,17 @@ function renderTree() {
       ${kids.length && open ? `<ul>${kids.map(k => node(k.id, depth + 1)).join('')}</ul>` : ''}</li>`;
   };
   $('#tree').innerHTML = `<ul>${node(S.root.id, 0)}</ul>`;
-  if ($('#cols')) $('#cols').innerHTML = `<ul>${COLS.map(c => { const n = S.colCounts.get(c.slug) || 0; return `<li><div class="node ${S.view.type === 'collection' && S.view.slug === c.slug && !S.query ? 'on' : ''} ${n ? '' : 'dim'}" style="--d:0" data-col="${c.slug}"><span class="caret-sp"></span><span class="nm">${esc(c.name)}</span><span class="ct">${n}</span></div></li>`; }).join('')}</ul>`;
+  if ($('#cols')) {
+    const groups = [...new Set(COLS.map(c => c.group))];
+    let html = '';
+    for (const gname of groups) {
+      const items = COLS.filter(c => c.group === gname && (S.colCounts.get(c.slug) || 0));
+      if (!items.length) continue;
+      html += `<div class="side-sub">${esc(gname)}</div><ul>${items.map(c => `<li><div class="node ${S.view.type === 'collection' && S.view.slug === c.slug && !S.query ? 'on' : ''}" style="--d:0" data-col="${c.slug}"><span class="caret-sp"></span><span class="nm">${esc(c.name)}</span><span class="ct">${S.colCounts.get(c.slug)}</span></div></li>`).join('')}</ul>`;
+    }
+    if (S.autoTags.length) html += `<div class="side-sub">From your AO3 tags</div><ul>${S.autoTags.map(t => `<li><div class="node ${S.view.type === 'tag' && norm(S.view.tag) === norm(t.tag) && !S.query ? 'on' : ''}" style="--d:0" data-tag="${esc(t.tag)}"><span class="caret-sp"></span><span class="nm">${esc(t.tag)}</span><span class="ct">${t.n}</span></div></li>`).join('')}</ul>`;
+    $('#cols').innerHTML = html || '<div class="side-sub">Collections appear as your fics get scanned.</div>';
+  }
   const u = S.user || {};
   $('#sideFoot').innerHTML = `
     ${S.canEdit && !S.editing ? `<button class="btn" data-act="enable-edit">${icon('edit')} Edit library</button>` : ''}
@@ -992,9 +1056,9 @@ function renderMain() {
   }
   if (isFolder && atRoot) {
     const cols = COLS.filter(c => S.colCounts.get(c.slug));
-    if (cols.length) h += `<div class="section-h">Browse by trope</div><div class="folders">${cols.map(c => `
-      <div class="ftile" data-col="${c.slug}" tabindex="0"><span class="fi">${icon('spark')}</span><div class="ft-txt"><b>${esc(c.name)}</b><small>${fmtNum(S.colCounts.get(c.slug))} fic${S.colCounts.get(c.slug) === 1 ? '' : 's'}</small></div></div>`).join('')}</div>`;
-    if (S.topTags.length) h += `<div class="section-h">Popular tags</div><div class="cloud">${S.topTags.map(t => `<button class="chip big" data-tag="${esc(t.tag)}">${esc(t.tag)} <span>${t.n}</span></button>`).join('')}</div>`;
+    if (cols.length) h += `<div class="section-h">Browse by trope</div>` + [...new Set(cols.map(c => c.group))].map(gname => `<div class="tile-sub">${esc(gname)}</div><div class="folders">${cols.filter(c => c.group === gname).map(c => `
+      <div class="ftile" data-col="${c.slug}" tabindex="0"><span class="fi">${icon('spark')}</span><div class="ft-txt"><b>${esc(c.name)}</b><small>${fmtNum(S.colCounts.get(c.slug))} fic${S.colCounts.get(c.slug) === 1 ? '' : 's'}</small></div></div>`).join('')}</div>`).join('');
+    if (S.topTags.length) h += `<div class="section-h">Other tags in your library</div><div class="cloud">${S.topTags.map(t => `<button class="chip big" data-tag="${esc(t.tag)}">${esc(t.tag)} <span>${t.n}</span></button>`).join('')}</div>`;
   }
   h += `<div class="toolbar"><div class="section-h">${q ? 'Results' : isFolder ? 'Fics' : 'Fics'}</div>
     ${isFolder && subs.length ? `<label class="toggle"><input type="checkbox" id="incSub" ${S.includeSub ? 'checked' : ''}> Include subfolders</label>` : ''}
