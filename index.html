@@ -908,6 +908,17 @@ function buildGroups() {
     const t = f.createdTime || f.modifiedTime || ''; if (t > g.added) g.added = t;
   }
   const order = { epub: 0, html: 1, pdf: 2, azw3: 3, mobi: 4 };
+  // Second pass: join copies that couldn't be matched by AO3 link (e.g. a PDF, which can't be read)
+  // to a card on the same shelf with the same title and a compatible author.
+  const widOf = g => { const w = g.meta.u && (g.meta.u.match(/works\/(\d+)/) || [])[1]; return w || ''; };
+  const authOk = (x, y) => !x || !y || norm(x) === norm(y) || norm(x).includes(norm(y)) || norm(y).includes(norm(x));
+  const byShelf = new Map();
+  for (const g of [...map.values()].sort((x, y) => richness(y.meta) - richness(x.meta))) {
+    const list = byShelf.get(g.parent) || []; byShelf.set(g.parent, list);
+    const into = list.find(h => sameTitle(h.meta.t, g.meta.t) && authOk(h.meta.a, g.meta.a) && !(widOf(h) && widOf(g) && widOf(h) !== widOf(g)));
+    if (into) { into.files.push(...g.files); if (g.added > into.added) into.added = g.added; map.delete(g.key); }
+    else list.push(g);
+  }
   S.groups = [...map.values()];
   S.groupByKey = new Map(); S.groupByFile = new Map();
   for (const g of S.groups) {
