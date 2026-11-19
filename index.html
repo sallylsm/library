@@ -467,7 +467,7 @@ const isJunk = name => /^\./.test(name) || /^(thumbs\.db|desktop\.ini)$/i.test(n
 const isFic = f => !isJunk(f.name) && f.mimeType !== FOLDER && ['html', 'epub', 'pdf', 'mobi', 'azw3'].includes(fmtOf(f));
 function guessMime(name) { return { epub: 'application/epub+zip', html: 'text/html', htm: 'text/html', pdf: 'application/pdf', mobi: 'application/x-mobipocket-ebook', azw3: 'application/vnd.amazon.ebook' }[extOf(name)] || 'application/octet-stream'; }
 function metaFromName(name) {
-  const base = String(name).replace(/\.[a-z0-9]+$/i, '').replace(/_/g, ' ').replace(/\s+/g, ' ').trim();
+  const base = String(name).replace(/\.[a-z0-9]+$/i, '').replace(/^[\s._]+/, '').replace(/_/g, ' ').replace(/\s+/g, ' ').trim();
   const m = base.match(/^(.*?)\s+-\s+(.*)$/);
   return m ? { t: m[1], a: m[2], guess: true } : { t: base, a: '', guess: true };
 }
@@ -556,7 +556,9 @@ async function parseBytes(buf, name) {
     else if (f === 'html') { const txt = new TextDecoder().decode(buf); m = parseAo3Doc(new DOMParser().parseFromString(txt, 'text/html'), txt); }
   } catch (e) { console.warn('parse failed', name, e); }
   const base = metaFromName(name); delete base.guess;
-  return Object.assign(base, Object.fromEntries(Object.entries(m).filter(([, v]) => v != null && v !== '')));
+  const out = Object.assign(base, Object.fromEntries(Object.entries(m).filter(([, v]) => v != null && v !== '')));
+  if (out.t) out.t = out.t.replace(/^[\s._]+/, '') || base.t;
+  return out;
 }
 function ratingKey(r) {
   if (!r) return '';
@@ -805,7 +807,14 @@ function collapseFicFolders() {
   }
 }
 function richness(m) { return m ? Object.keys(m).filter(k => k !== 'guess').length + (m.guess ? -5 : 0) : -99; }
-function metaFor(f) { return parseDesc(f.description) || S.metaCache[f.id + ':' + (f.modifiedTime || '')] || metaFromName(f.name); }
+const badTitle = m => !m || !m.t || /^[\s._]/.test(m.t);
+function metaFor(f) {
+  const d = parseDesc(f.description);
+  if (d && !badTitle(d)) return d;          // details saved from a junk "._" file count as unscanned
+  const c = S.metaCache[f.id + ':' + (f.modifiedTime || '')];
+  if (c && !badTitle(c)) return c;
+  return metaFromName(f.name);
+}
 function buildGroups() {
   const map = new Map();
   for (const f of S.files) {
@@ -1074,7 +1083,7 @@ function openDetail(g) {
   }
 }
 async function scanGroup(g, save) {
-  const f = g.files.find(x => READABLE.includes(x.fmt)); if (!f) return false;
+  const f = g.files.find(x => READABLE.includes(x.fmt) && !isJunk(x.name)); if (!f) return false;
   const buf = await S.store.getBytes(f.id);
   const m = await parseBytes(buf, f.name);
   for (const file of g.files) {
