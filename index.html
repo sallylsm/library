@@ -517,10 +517,30 @@ function fmtOf(f) {
 const isJunk = name => /^\./.test(name) || /^(thumbs\.db|desktop\.ini)$/i.test(name);
 const isFic = f => !isJunk(f.name) && f.mimeType !== FOLDER && ['html', 'epub', 'pdf', 'mobi', 'azw3'].includes(fmtOf(f));
 function guessMime(name) { return { epub: 'application/epub+zip', html: 'text/html', htm: 'text/html', pdf: 'application/pdf', mobi: 'application/x-mobipocket-ebook', azw3: 'application/vnd.amazon.ebook' }[extOf(name)] || 'application/octet-stream'; }
+const decodeEntities = (() => { const ta = document.createElement('textarea'); return str => { if (!/&[#a-z0-9]+;/i.test(str)) return str; ta.innerHTML = str; return ta.value; }; })();
+/* Clean up titles like "Malfoy Method - WalkingOcclumens - Harry Potter - J. K. Rowling, The - Unknown"
+   (e-book app exports) and "Lamb to the Slaughter, A" into "The Malfoy Method" / "A Lamb to the Slaughter". */
+function cleanTitle(t, author) {
+  let x = decodeEntities(String(t || '')).replace(/^[\s._]+/, '').replace(/\s+-\s+Unknown$/i, '').trim();
+  let art = '';
+  const am = x.match(/,\s*(The|A|An)$/); if (am) { art = am[1]; x = x.slice(0, am.index).trim(); }
+  const parts = x.split(/\s+-\s+/);
+  if (parts.length >= 3 || (parts.length === 2 && author && norm(parts[1]) === norm(author))) x = parts[0];
+  if (art && !new RegExp('^' + art + '\\s', 'i').test(x)) x = art + ' ' + x;
+  return x.trim();
+}
+const titleKey = t => decodeEntities(String(t || '')).toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g, '').replace(/^(the|a|an)\s+/, '').replace(/[^\p{L}\p{N}]+/gu, '');
+function sameTitle(a, b, loose) {
+  const A = titleKey(a), B = titleKey(b); if (!A || !B) return false; if (A === B) return true;
+  const [sh, lo] = A.length <= B.length ? [A, B] : [B, A];
+  return sh.length >= 8 && lo.startsWith(sh) && (loose || sh.length / lo.length >= 0.7);
+}
 function metaFromName(name) {
-  const base = String(name).replace(/\.[a-z0-9]+$/i, '').replace(/^[\s._]+/, '').replace(/_/g, ' ').replace(/\s+/g, ' ').trim();
-  const m = base.match(/^(.*?)\s+-\s+(.*)$/);
-  return m ? { t: m[1], a: m[2], guess: true } : { t: base, a: '', guess: true };
+  let base = decodeEntities(String(name)).replace(/\.[a-z0-9]+$/i, '').replace(/^[\s._]+/, '').replace(/\s+-\s+Unknown$/i, '');
+  if (!/\s-\s/.test(base)) base = base.replace(/_/g, ' ');
+  base = base.replace(/\s+/g, ' ').trim();
+  const parts = base.split(/\s+-\s+/);
+  return { t: cleanTitle(base), a: parts.length > 1 ? parts[1].replace(/,\s*(The|A|An)$/, '') : '', guess: true };
 }
 const textOf = el => (el && el.textContent || '').replace(/\s+/g, ' ').trim();
 function blockText(el) { const ps = $$('p', el).map(textOf).filter(Boolean); return (ps.length ? ps.join('\n\n') : textOf(el)).trim(); }
@@ -608,7 +628,7 @@ async function parseBytes(buf, name) {
   } catch (e) { console.warn('parse failed', name, e); }
   const base = metaFromName(name); delete base.guess;
   const out = Object.assign(base, Object.fromEntries(Object.entries(m).filter(([, v]) => v != null && v !== '')));
-  if (out.t) out.t = out.t.replace(/^[\s._]+/, '') || base.t;
+  if (out.t) out.t = cleanTitle(out.t, out.a) || base.t;
   return out;
 }
 function ratingKey(r) {
@@ -816,7 +836,7 @@ async function fetchTree(onProgress) {
       if (seen.has(it.id)) continue; seen.add(it.id);
       const pid = (it.parents || []).find(p => folders.has(p)); if (!pid) continue;
       if (isJunk(it.name)) { if (it.mimeType !== FOLDER) junk.push({ ...it, parent: pid }); continue; }
-      if (it.mimeType === FOLDER) { folders.set(it.id, { id: it.id, name: it.name, parent: pid, children: [] }); folders.get(pid).children.push(it.id); next.push(it.id); }
+      if (it.mimeType === FOLDER) { folders.set(it.id, { id: it.id, name: decodeEntities(it.name), parent: pid, children: [] }); folders.get(pid).children.push(it.id); next.push(it.id); }
       else if (isFic(it)) files.push({ ...it, parent: pid });
     }
     level = next;
@@ -835,43 +855,51 @@ const cacheKey = () => 'lib:' + userKey() + ':' + CONFIG.rootFolderId;
 const saveCache = (() => { let t; return () => { if (DEMO || !S.root) return; clearTimeout(t); t = setTimeout(() => idb.set(cacheKey(), { v: 1, at: Date.now(), root: S.root, canEdit: S.canEdit, folders: [...S.folders.values()], files: S.files, junk: S.junk, ficFolders: [...S.ficFolders.values()] }), 600); }; })();
 function applySnapshot(c) {
   S.root = c.root; S.canEdit = c.canEdit;
-  S.folders = new Map(c.folders.map(f => [f.id, f])); S.files = c.files; S.junk = c.junk || [];
+  S.folders = new Map(c.folders.map(f => [f.id, { ...f, name: decodeEntities(f.name) }])); S.files = c.files; S.junk = c.junk || [];
   S.ficFolders = new Map((c.ficFolders || []).map(f => [f.id, f]));
   buildGroups();
 }
-/* A folder named after the one fic inside it (e.g. "Manacled" holding Manacled.epub + Manacled.html)
-   is shown as that fic, not as a shelf. */
+/* A folder named after a fic (e.g. "Manacled", or "Title - author - fandom" from an e-book app) is shown
+   as that fic rather than as a shelf. Handles folders nested inside a same-named folder, and stray fics
+   that were filed inside another fic's folder (those show as their own cards). */
 function collapseFicFolders() {
   S.ficFolders = new Map();
-  for (const f of [...S.folders.values()]) {
-    if (f.id === S.root.id || f.children.length) continue;
-    const fs = S.files.filter(x => x.parent === f.id);
-    if (!fs.length) continue;
-    const metas = fs.map(metaFor);
-    const keys = new Set(metas.map(m => { const w = m.u && (m.u.match(/works\/(\d+)/) || [])[1]; return w ? 'w' + w : norm(m.t); }));
-    if (keys.size !== 1) continue;
-    const fn = norm(f.name), tn = norm(metas[0].t);
-    if (!(fn && tn && (fn === tn || (fn.length >= 4 && (tn.startsWith(fn) || fn.startsWith(tn)))))) continue;
-    for (const x of fs) { x.driveParent = f.id; x.parent = f.parent; }
-    const par = S.folders.get(f.parent); par.children = par.children.filter(c => c !== f.id);
-    S.folders.delete(f.id); S.ficFolders.set(f.id, f);
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const f of [...S.folders.values()]) {
+      if (f.id === S.root.id || f.parent === S.root.id || f.children.length) continue;
+      const fs = S.files.filter(x => x.parent === f.id);
+      if (!fs.length) continue;
+      const ftitle = cleanTitle(f.name);
+      const metas = fs.map(metaFor);
+      if (!metas.some(m => sameTitle(ftitle, m.t))) continue;
+      const others = new Set(metas.filter(m => !sameTitle(ftitle, m.t, true)).map(m => titleKey(m.t)));
+      if (others.size > 2) continue;           // looks like a real shelf, not one fic's folder
+      for (const x of fs) { x.driveParent = f.id; x.parent = f.parent; }
+      const par = S.folders.get(f.parent); par.children = par.children.filter(c => c !== f.id);
+      S.folders.delete(f.id); S.ficFolders.set(f.id, { ...f, title: ftitle }); changed = true;
+    }
   }
 }
-function richness(m) { return m ? Object.keys(m).filter(k => k !== 'guess').length + (m.guess ? -5 : 0) : -99; }
+function richness(m) { return m ? Object.keys(m).filter(k => k !== 'guess').length + (m.guess ? -5 : 0) + (m.s ? 2 : 0) + (m.p && m.p.length ? 1 : 0) + (m.a ? 1 : 0) + Math.min(String(m.t || '').length, 80) / 1000 : -99; }
 const badTitle = m => !m || !m.t || /^[\s._]/.test(m.t);
 function metaFor(f) {
-  const d = parseDesc(f.description);
-  if (d && !badTitle(d)) return d;          // details saved from a junk "._" file count as unscanned
-  const c = S.metaCache[f.id + ':' + (f.modifiedTime || '')];
-  if (c && !badTitle(c)) return c;
-  return metaFromName(f.name);
+  let m = parseDesc(f.description);          // details saved from a junk "._" file count as unscanned
+  if (!m || badTitle(m)) { const c = S.metaCache[f.id + ':' + (f.modifiedTime || '')]; m = c && !badTitle(c) ? c : metaFromName(f.name); }
+  let a = m.a ? decodeEntities(m.a) : '';
+  if (!a || /^unknown$/i.test(a)) { const parts = decodeEntities(String(m.t || '')).split(/\s+-\s+/); a = parts.length > 1 ? parts[1] : ''; }
+  a = a.split(/\s+-\s+/)[0].replace(/,\s*(The|A|An)$/, '').trim();
+  return { ...m, t: cleanTitle(m.t, a), a };
 }
 function buildGroups() {
   const map = new Map();
   for (const f of S.files) {
     const meta = metaFor(f);
     const wid = meta.u && (meta.u.match(/works\/(\d+)/) || [])[1];
-    const key = f.parent + '|' + (wid ? 'w' + wid : norm(meta.t) + '|' + norm(meta.a));
+    const ff = f.driveParent && S.ficFolders.get(f.driveParent);
+    const key = ff && sameTitle(ff.title, meta.t, true) ? f.parent + '|ff' + ff.id
+      : f.parent + '|' + (wid ? 'w' + wid : titleKey(meta.t) + '|' + norm(meta.a));
     let g = map.get(key);
     const file = { ...f, fmt: fmtOf(f) };
     if (!g) { g = { key, parent: f.parent, meta, files: [], added: f.createdTime || f.modifiedTime || '' }; map.set(key, g); }
@@ -1269,7 +1297,7 @@ async function moveGroup(g) {
   if (!r || r.to === g.parent) return;
   await guarded(async () => {
     const ff = g.files[0].driveParent && S.ficFolders.get(g.files[0].driveParent);
-    if (ff && g.files.every(f => f.driveParent === ff.id)) { await S.store.move(ff.id, r.to, ff.parent); ff.parent = r.to; for (const f of g.files) S.files.find(x => x.id === f.id).parent = r.to; }
+    if (ff && g.files.every(f => f.driveParent === ff.id) && S.files.filter(x => x.driveParent === ff.id).length === g.files.length) { await S.store.move(ff.id, r.to, ff.parent); ff.parent = r.to; for (const f of g.files) S.files.find(x => x.id === f.id).parent = r.to; }
     else for (const f of g.files) { const live = S.files.find(x => x.id === f.id); await S.store.move(f.id, r.to, f.driveParent || f.parent); live.parent = r.to; delete live.driveParent; }
     buildGroups(); render(); toast(`Moved to ${folderName(r.to)}.`);
   });
