@@ -523,6 +523,7 @@ const decodeEntities = (() => { const ta = document.createElement('textarea'); r
    (e-book app exports) and "Lamb to the Slaughter, A" into "The Malfoy Method" / "A Lamb to the Slaughter". */
 function cleanTitle(t, author) {
   let x = decodeEntities(String(t || '')).replace(/^[\s._]+/, '').replace(/\s+-\s+Unknown$/i, '').trim();
+  { const ba = byAo3(x); if (ba) x = ba.t; }
   let art = '';
   const am = x.match(/,\s*(The|A|An)$/); if (am) { art = am[1]; x = x.slice(0, am.index).trim(); }
   const parts = x.split(/\s+-\s+/);
@@ -536,8 +537,10 @@ function sameTitle(a, b, loose) {
   const [sh, lo] = A.length <= B.length ? [A, B] : [B, A];
   return sh.length >= 8 && lo.startsWith(sh) && (loose || sh.length / lo.length >= 0.7);
 }
+function byAo3(t) { const m = String(t || '').replace(/_/g, ' ').replace(/\s+/g, ' ').trim().match(/^(.+?)\s+by\s+(.+?)\s+ao3$/i); return m ? { t: m[1], a: m[2] } : null; }
 function metaFromName(name) {
   let base = decodeEntities(String(name)).replace(/\.[a-z0-9]+$/i, '').replace(/^[\s._]+/, '').replace(/\s+-\s+Unknown$/i, '');
+  const ba = byAo3(base); if (ba) return { t: ba.t, a: ba.a, guess: true };
   if (!/\s-\s/.test(base)) base = base.replace(/_/g, ' ');
   base = base.replace(/\s+/g, ' ').trim();
   const parts = base.split(/\s+-\s+/);
@@ -620,12 +623,49 @@ async function parseEpub(buf) {
   }
   return m;
 }
+/* PDFs: read the document's own Title/Author (most AO3 and browser-made PDFs have them). */
+function pdfString(tok) {
+  let bytes = [];
+  if (tok[0] === '<') { const h = tok.slice(1, -1).replace(/\s+/g, ''); for (let i = 0; i < h.length; i += 2) bytes.push(parseInt(h.substr(i, 2).padEnd(2, '0'), 16)); }
+  else {
+    const str = tok.slice(1, -1);
+    for (let i = 0; i < str.length; i++) {
+      const c = str[i];
+      if (c !== '\\') { bytes.push(c.charCodeAt(0) & 255); continue; }
+      const n = str[++i]; if (n === undefined) break;
+      if (/[0-7]/.test(n)) { let o = n; while (o.length < 3 && /[0-7]/.test(str[i + 1])) o += str[++i]; bytes.push(parseInt(o, 8) & 255); }
+      else if (n === '\r' || n === '\n') { if (n === '\r' && str[i + 1] === '\n') i++; }
+      else bytes.push(({ n: 10, r: 13, t: 9, b: 8, f: 12 })[n] ?? n.charCodeAt(0));
+    }
+  }
+  if (bytes[0] === 0xFE && bytes[1] === 0xFF) { let o = ''; for (let i = 2; i + 1 < bytes.length; i += 2) o += String.fromCharCode(bytes[i] << 8 | bytes[i + 1]); return o.trim(); }
+  if (bytes[0] === 0xEF && bytes[1] === 0xBB && bytes[2] === 0xBF) return new TextDecoder().decode(new Uint8Array(bytes.slice(3))).trim();
+  return String.fromCharCode(...bytes).trim();
+}
+function parsePdf(buf) {
+  const u8 = new Uint8Array(buf); let text = '';
+  for (let i = 0; i < u8.length; i += 65536) text += String.fromCharCode.apply(null, u8.subarray(i, i + 65536));
+  const STR = String.raw`(\((?:\\[\s\S]|[^\\)])*\)|<[0-9A-Fa-f\s]*>)`;
+  const m = {};
+  const re = /\/(Producer|CreationDate|ModDate|Creator)\b/g; let hit;
+  while ((hit = re.exec(text))) {
+    const a = text.lastIndexOf('<<', hit.index), b = text.indexOf('>>', hit.index);
+    if (a < 0 || b < 0 || b - a > 4000) continue;
+    const dict = text.slice(a, b);
+    const t = dict.match(new RegExp('/Title\\s*' + STR)), au = dict.match(new RegExp('/Author\\s*' + STR));
+    if (t) { const v = pdfString(t[1]); if (v && !/^(untitled|document|microsoft word)/i.test(v)) m.t = v; }
+    if (au) { const v = pdfString(au[1]); if (v) m.a = v; }
+    if (m.t) break;
+  }
+  return m;
+}
 async function parseBytes(buf, name) {
   const f = fmtOf({ name });
   let m = {};
   try {
     if (f === 'epub') m = await parseEpub(buf);
     else if (f === 'html') { const txt = new TextDecoder().decode(buf); m = parseAo3Doc(new DOMParser().parseFromString(txt, 'text/html'), txt); }
+    else if (f === 'pdf') m = parsePdf(buf);
   } catch (e) { console.warn('parse failed', name, e); }
   const base = metaFromName(name); delete base.guess;
   const out = Object.assign(base, Object.fromEntries(Object.entries(m).filter(([, v]) => v != null && v !== '')));
@@ -871,7 +911,7 @@ function collapseFicFolders() {
   while (changed) {
     changed = false;
     for (const f of [...S.folders.values()]) {
-      if (f.id === S.root.id || f.parent === S.root.id || f.children.length) continue;
+      if (f.id === S.root.id || f.children.length) continue;
       const fs = S.files.filter(x => x.parent === f.id);
       if (!fs.length) continue;
       const ftitle = cleanTitle(f.name);
@@ -890,6 +930,7 @@ const badTitle = m => !m || !m.t || /^[\s._]/.test(m.t);
 function metaFor(f) {
   let m = parseDesc(f.description);          // details saved from a junk "._" file count as unscanned
   if (!m || badTitle(m)) { const c = S.metaCache[f.id + ':' + (f.modifiedTime || '')]; m = c && !badTitle(c) ? c : metaFromName(f.name); }
+  const ba = byAo3(m.t); if (ba) m = { ...m, t: ba.t, a: m.a && !/^unknown$/i.test(m.a) ? m.a : ba.a };
   let a = m.a ? decodeEntities(m.a) : '';
   if (!a || /^unknown$/i.test(a)) { const parts = decodeEntities(String(m.t || '')).split(/\s+-\s+/); a = parts.length > 1 ? parts[1] : ''; }
   a = a.split(/\s+-\s+/)[0].replace(/,\s*(The|A|An)$/, '').trim();
@@ -1300,7 +1341,7 @@ async function importEntries(entries, base = S.current) {
 
   const t = toast(`Reading 0 of ${ents.length} files…`, { sticky: true });
   let n = 0, k = 0;
-  const reader = async () => { while (k < ents.length) { const e = ents[k++]; e.fmt = fmtOf({ name: e.file.name }); try { e.meta = READABLE.includes(e.fmt) ? await parseBytes(await e.file.arrayBuffer(), e.file.name) : (({ guess, ...m }) => m)(metaFromName(e.file.name)); } catch { e.meta = metaFromName(e.file.name); } e.meta.t = cleanTitle(e.meta.t, e.meta.a); n++; t.update(`Reading ${n} of ${ents.length} files…`); } };
+  const reader = async () => { while (k < ents.length) { const e = ents[k++]; e.fmt = fmtOf({ name: e.file.name }); try { e.meta = (READABLE.includes(e.fmt) || e.fmt === 'pdf') ? await parseBytes(await e.file.arrayBuffer(), e.file.name) : (({ guess, ...m }) => m)(metaFromName(e.file.name)); } catch { e.meta = metaFromName(e.file.name); } e.meta.t = cleanTitle(e.meta.t, e.meta.a); n++; t.update(`Reading ${n} of ${ents.length} files…`); } };
   await Promise.all([reader(), reader(), reader(), reader()]);
 
   // which local folders are a single fic's folder (ignored) vs. categories (become shelves)
