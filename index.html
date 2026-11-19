@@ -13,8 +13,8 @@ const CONFIG = {
   siteTitle:    'The Library',
   tagline:      'A private archive of well-loved fics',
   ownerName:    'Sally',            // shown on the sign-in and "no access" screens
-  clientId:     '435305536942-akgg2bfojgrts060apl6e4n6glh1lo70.apps.googleusercontent.com',                 // Google OAuth Client ID, ends in .apps.googleusercontent.com
-  rootFolderId: 'folders/1yz7GeIyne9HrpBYg3viUk8dUC7Pq-9dQ',                 // ID of your library folder in Google Drive
+  clientId:     '435305536942-akgg2bfojgrts060apl6e4n6glh1lo70.apps.googleusercontent.com',  // Google OAuth Client ID
+  rootFolderId: '1yz7GeIyne9HrpBYg3viUk8dUC7Pq-9dQ',  // Drive folder ID (a full Drive folder link works too)
   defaultTheme: 'academia',         // academia | cozy | modern | bookshelf
 
   /* COLLECTIONS — filled in automatically from each fic's AO3 tags.
@@ -39,6 +39,9 @@ const CONFIG = {
     { name: 'Works in Progress', rule: 'wip' }
   ]
 };
+// Accept a bare ID, "folders/ID", or a full Drive link.
+CONFIG.clientId = String(CONFIG.clientId || '').trim();
+CONFIG.rootFolderId = (String(CONFIG.rootFolderId || '').match(/[-\w]{15,}/) || [''])[0];
 try { document.documentElement.dataset.theme = JSON.parse(localStorage.getItem('fanlib:lastTheme')) || CONFIG.defaultTheme; } catch (e) {}
 </script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -393,7 +396,7 @@ const icon = (n, cls = '') => `<svg class="i ${cls}" viewBox="0 0 24 24" aria-hi
 const S = {
   store: null, user: null, root: null,
   folders: new Map(), files: [], groups: [], groupByKey: new Map(), groupByFile: new Map(), counts: new Map(),
-  current: null, view: { type: 'folder' }, colCounts: new Map(), topTags: [], query: '', sort: 'added', rating: 'all', fmt: 'all', includeSub: true,
+  current: null, view: { type: 'folder' }, colCounts: new Map(), topTags: [], query: '', sort: 'added', rating: 'all', ship: 'all', shipOpts: [], fmt: 'all', includeSub: true,
   canEdit: false, editing: false, open: new Set(),
   metaCache: ls.get('fanlib:meta', {}), prefs: {}, reading: null, book: null, rend: null, toc: []
 };
@@ -647,7 +650,8 @@ class DemoStore {
     const folder = (name, parent) => { const id = this.id(); this.items.set(id, { id, name, mimeType: FOLDER, parents: [parent] }); return id; };
     const dm = folder('Dramione', 'root');
     const au = folder('Alternate Universe', dm), ph = folder('Post-Hogwarts', dm), pw = folder('Post-War', dm), wt = folder('Wartime', dm);
-    const HD = ['Hermione Granger/Draco Malfoy'], FAN = ['Harry Potter - J. K. Rowling'];
+    const wv = folder('Wanda & Vision', 'root');
+    const HD = ['Hermione Granger/Draco Malfoy'], WV = ['Vision/Wanda Maximoff'], FAN = ['Harry Potter - J. K. Rowling'];
     const fics = [
       ['The Cartographer\u2019s Apprentice', 'inkwell_ophelia', 'Mature', 142300, '38/38', ph, HD, ['Enemies to Lovers', 'Forced Proximity', 'Ministry of Magic', 'Slow Burn', 'Happy Ending'], 'Assigned to map the shifting corridors beneath the Ministry, Hermione expects tedium. She does not expect her partner to be Draco Malfoy, or for the maps to start redrawing themselves around the two of them.', ['epub', 'html']],
       ['Ink & Ash', 'moonlit_quill', 'Explicit', 98450, '24/24', wt, HD, ['Dark', 'Morally Grey Draco Malfoy', 'Spy Hermione Granger', 'Angst with a Happy Ending'], 'Two people on opposite sides of a war, one cursed manuscript, and a deadline neither of them can afford to miss.', ['epub']],
@@ -662,11 +666,13 @@ class DemoStore {
       ['Paper Cranes', 'moonlit_quill', 'General Audiences', 9800, '1/1', pw, HD, ['Oneshot', 'Fluff', 'Healer Hermione'], 'One thousand paper cranes, folded one bad day at a time.', ['html']],
       ['The Lantern Room', 'nightjar_notes', 'Mature', 88100, '26/26', au, HD, ['Alternate Universe - Muggle', 'Lighthouse AU', 'Slow Burn', 'Hurt/Comfort'], 'The new lighthouse keeper was told to expect solitude. Nobody mentioned the man who rows out every evening with the post.', ['epub']],
       ['Unspoken Clauses', 'velvetpage', 'Teen And Up Audiences', 29400, '9/9', pw, HD, ['Marriage Law', 'Fake Relationship', 'Humor'], 'It is a strictly professional arrangement. There is a contract. There are terms. There is, crucially, a no-hand-holding clause.', ['epub', 'html']],
+      ['Static Between Stations', 'redhexwrites', 'Teen And Up Audiences', 38200, '10/10', wv, WV, ['Post-Avengers: Endgame', 'Slow Burn', 'Domestic Fluff', 'Grief/Mourning'], 'A radio that only picks up one station, and a voice on it that sounds exactly like someone she lost.', ['epub']],
+      ['Chaos Theory', 'mindstone_muse', 'Mature', 102700, '30/30', wv, WV, ['Alternate Universe - No Powers', 'Enemies to Lovers', 'Dark'], 'A physics lab, a rival post-doc with an unnervingly calm voice, and a grant only one of them can win.', ['epub', 'html']],
       ['The Long Night', 'nocturne_ledger', 'Explicit', 164000, '41/45', wt, HD, ['Voldemort Wins', 'Love Triangle', 'Morally Grey Hermione Granger', 'Dark Lord Voldemort'], 'The war is lost. What is left is a choice between two men, two kinds of survival, and the truth about what she has become.', ['epub']]
     ];
     fics.forEach((f, i) => {
       const [t, a, r, w, c, parent, p, g, s, fmts] = f;
-      const meta = { t, a, r, w, c, k: !/\?/.test(c) && c.split('/')[0] === c.split('/')[1], f: FAN, p, g, s, wr: ['No Archive Warnings Apply'], u: '' };
+      const meta = { t, a, r, w, c, k: !/\?/.test(c) && c.split('/')[0] === c.split('/')[1], f: p === WV ? ['Marvel Cinematic Universe', 'WandaVision (TV)'] : FAN, p, g, s, wr: ['No Archive Warnings Apply'], u: '' };
       delete meta.u;
       for (const fm of fmts) {
         const id = this.id(), ts = new Date(now - (i * 2.3 + (fm === 'html' ? .1 : 0)) * day).toISOString();
@@ -775,6 +781,9 @@ function visibleGroups() {
   else if (S.view.type === 'collection') { const c = COLS.find(x => x.slug === S.view.slug); list = c ? S.groups.filter(g => inCol(g, c)) : []; }
   else if (S.view.type === 'tag') { const k = norm(S.view.tag); list = S.groups.filter(g => allTagsOf(g).some(t => norm(t) === k)); }
   else { const ids = new Set(S.includeSub ? descendants(S.current) : [S.current]); list = S.groups.filter(g => ids.has(g.parent)); }
+  const sc = new Map(); for (const g of list) for (const pr of new Set(g.meta.p || [])) sc.set(pr, (sc.get(pr) || 0) + 1);
+  S.shipOpts = [...sc.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).slice(0, 25);
+  if (S.ship !== 'all') list = list.filter(g => (g.meta.p || []).includes(S.ship));
   if (S.rating !== 'all') list = list.filter(g => (ratingKey(g.meta.r) || 'n') === S.rating);
   if (S.fmt !== 'all') list = list.filter(g => g.files.some(f => f.fmt === S.fmt));
   const by = {
@@ -895,6 +904,7 @@ function renderMain() {
   }
   h += `<div class="toolbar"><div class="section-h">${q ? 'Results' : isFolder ? 'Fics' : 'Fics'}</div>
     ${isFolder && subs.length ? `<label class="toggle"><input type="checkbox" id="incSub" ${S.includeSub ? 'checked' : ''}> Include subfolders</label>` : ''}
+    ${S.shipOpts.length > 1 || S.ship !== 'all' ? `<select class="sel" id="fShip" aria-label="Ship" style="max-width:240px"><option value="all">All ships</option>${S.shipOpts.map(([k, n]) => `<option value="${esc(k)}" ${S.ship === k ? 'selected' : ''}>${esc(k)} (${n})</option>`).join('')}${S.ship !== 'all' && !S.shipOpts.some(([k]) => k === S.ship) ? `<option value="${esc(S.ship)}" selected>${esc(S.ship)}</option>` : ''}</select>` : ''}
     <select class="sel" id="fRating" aria-label="Rating"><option value="all">All ratings</option>${Object.entries(RNAME).map(([k, v]) => `<option value="${k}" ${S.rating === k ? 'selected' : ''}>${v}</option>`).join('')}</select>
     <select class="sel" id="fFmt" aria-label="Format"><option value="all">All formats</option><option value="epub" ${S.fmt === 'epub' ? 'selected' : ''}>EPUB</option><option value="html" ${S.fmt === 'html' ? 'selected' : ''}>HTML</option><option value="pdf" ${S.fmt === 'pdf' ? 'selected' : ''}>PDF</option></select>
     <select class="sel" id="fSort" aria-label="Sort">${[['added', 'Recently added'], ['title', 'Title A–Z'], ['author', 'Author'], ['long', 'Longest first'], ['short', 'Shortest first']].map(([k, v]) => `<option value="${k}" ${S.sort === k ? 'selected' : ''}>${v}</option>`).join('')}</select></div>`;
@@ -902,12 +912,12 @@ function renderMain() {
     : `<div class="empty"><b>${q ? 'Nothing found' : 'This shelf is empty'}</b>${q ? 'Try a different word, ship or tag.' : S.editing ? 'Upload fics or drag files anywhere on this page.' : 'Nothing here yet.'}</div>`;
   main.innerHTML = h;
   const bind = (id, k, f = v => v) => { const el = $('#' + id); if (el) el.onchange = e => { S[k] = f(e.target.type === 'checkbox' ? e.target.checked : e.target.value); renderMain(); }; };
-  bind('incSub', 'includeSub'); bind('fRating', 'rating'); bind('fFmt', 'fmt'); bind('fSort', 'sort');
+  bind('incSub', 'includeSub'); bind('fShip', 'ship'); bind('fRating', 'rating'); bind('fFmt', 'fmt'); bind('fSort', 'sort');
 }
 function render() { renderTree(); renderMain(); }
 
 function setView(view, hsh, push) {
-  S.view = view; S.query = ''; const qi = $('#q'); if (qi) { qi.value = ''; $('.search .clear').hidden = true; }
+  S.view = view; S.query = ''; S.ship = 'all'; const qi = $('#q'); if (qi) { qi.value = ''; $('.search .clear').hidden = true; }
   document.body.classList.remove('nav-open');
   if (push && location.hash.slice(1) !== hsh) { try { history.pushState(null, '', '#' + hsh); } catch {} }
   render(); window.scrollTo({ top: 0 });
@@ -921,7 +931,7 @@ function routeFromHash() {
   const m = hsh.match(/^f-(.+)$/); go(m && S.folders.has(m[1]) ? m[1] : S.root.id, false);
 }
 function go(folderId, push = true) {
-  S.view = { type: 'folder' };
+  S.view = { type: 'folder' }; S.ship = 'all';
   if (!S.folders.has(folderId)) folderId = S.root.id;
   S.current = folderId; S.query = ''; const qi = $('#q'); if (qi) { qi.value = ''; $('.search .clear').hidden = true; }
   document.body.classList.remove('nav-open');
