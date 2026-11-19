@@ -1,0 +1,1410 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="academia">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Library</title>
+<script>
+/* ============================================================
+   SETTINGS — the only part you need to edit.
+   Leave clientId or rootFolderId empty to run in demo mode.
+   ============================================================ */
+const CONFIG = {
+  siteTitle:    'The Library',
+  tagline:      'A private archive of well-loved fics',
+  ownerName:    'Sally',            // shown on the sign-in and "no access" screens
+  clientId:     '',                 // Google OAuth Client ID, ends in .apps.googleusercontent.com
+  rootFolderId: '',                 // ID of your library folder in Google Drive
+  defaultTheme: 'academia',         // academia | cozy | modern | bookshelf
+
+  /* COLLECTIONS — filled in automatically from each fic's AO3 tags.
+     No sorting needed: a fic tagged "Voldemort Wins" on AO3 shows up in that collection.
+     A fic can be in many collections at once. Add, rename or delete these freely.
+       tags:    words to look for in the AO3 tags (any one is enough)
+       exclude: tags to ignore (e.g. "Dark Lord" shouldn't count as a dark fic)
+       rule:    'oneshot' (1 chapter) · 'long' (100k+ words) · 'short' (under 10k) · 'complete' · 'wip'  */
+  collections: [
+    { name: 'Voldemort Wins',    tags: ['Voldemort Wins', 'Voldemort Won', 'Dark Lord Wins', 'Death Eaters Win'] },
+    { name: 'Love Triangle',     tags: ['Love Triangle', 'Love Triangles'] },
+    { name: 'Dark',              tags: ['Dark', 'Dark Fic', 'Dark Themes', 'Dark Hermione Granger', 'Dark Draco Malfoy', 'Dark Romance'],
+                                 exclude: ['Dark Lord', 'Dark Mark', 'Dark Arts', 'Dark Magic', 'Dark Lord Voldemort'] },
+    { name: 'Healer Hermione',   tags: ['Healer Hermione', 'Healer!Hermione', 'Healer Hermione Granger', 'Hermione Granger is a Healer'] },
+    { name: 'Morally Grey',      tags: ['Morally Grey', 'Morally Gray', 'Morally Grey Draco Malfoy', 'Morally Grey Hermione Granger', 'Morally Ambiguous'] },
+    { name: 'Slow Burn',         tags: ['Slow Burn', 'Slowest of Slow Burns', 'Very Slow Burn'] },
+    { name: 'One Shot',          tags: ['One Shot', 'Oneshot', 'One-Shot'], rule: 'oneshot' },
+    { name: 'Enemies to Lovers', tags: ['Enemies to Lovers', 'Enemies to Friends to Lovers', 'Rivals to Lovers'] },
+    { name: 'Arranged Marriage', tags: ['Arranged Marriage', 'Marriage Law', 'Forced Marriage', 'Marriage of Convenience'] },
+    { name: 'Time Travel',       tags: ['Time Travel', 'Time Turners', 'Time Loop'] },
+    { name: 'Long Fics (100k+)', rule: 'long' },
+    { name: 'Works in Progress', rule: 'wip' }
+  ]
+};
+try { document.documentElement.dataset.theme = JSON.parse(localStorage.getItem('fanlib:lastTheme')) || CONFIG.defaultTheme; } catch (e) {}
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=EB+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Inter:wght@400;500;600&family=Lora:ital,wght@0,400;0,500;0,600;1,400&family=Nunito:wght@400;600;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
+<style>
+/* ---------------- THEMES ---------------- */
+html[data-theme="academia"]{
+  --bg:#13110e; --bg-grad:radial-gradient(1100px 600px at 0% -10%,#2a2217 0%,transparent 60%),radial-gradient(900px 520px at 110% 0%,#1b2820 0%,transparent 55%);
+  --surface:#1b1814; --card:#211d18; --card-hover:#29241d; --ink:#ece2cf; --muted:#a59578; --line:#372f25;
+  --accent:#c39c5c; --accent-ink:#1a150e; --accent-soft:rgba(195,156,92,.14); --chip:#2b251d; --chip-ink:#dccaa6; --danger:#c8655e;
+  --font-display:'Cormorant Garamond',Georgia,serif; --font-body:'EB Garamond',Georgia,serif; --ui-size:17px;
+  --radius:6px; --shadow:0 14px 34px rgba(0,0,0,.5);
+  --reader-bg:#191612; --reader-ink:#e8dcc4; --reader-font:'EB Garamond',Georgia,serif;
+  --r-g:#5f7d5b; --r-t:#56708f; --r-m:#a86f3c; --r-e:#953e3e; --r-n:#6d6559;
+}
+html[data-theme="cozy"]{
+  --bg:#fbf5ee; --bg-grad:radial-gradient(900px 520px at 0% 0%,#f9e3df 0%,transparent 60%),radial-gradient(800px 500px at 100% 0%,#f3eadb 0%,transparent 55%);
+  --surface:#f7ede4; --card:#fffaf5; --card-hover:#fff3ec; --ink:#4b3a35; --muted:#9d867c; --line:#eddccf;
+  --accent:#d0858b; --accent-ink:#fff; --accent-soft:rgba(208,133,139,.16); --chip:#f8e6e1; --chip-ink:#8b5b59; --danger:#c4545b;
+  --font-display:'Lora',Georgia,serif; --font-body:'Nunito',system-ui,sans-serif; --ui-size:15px;
+  --radius:20px; --shadow:0 10px 28px rgba(150,100,80,.14);
+  --reader-bg:#fff8f1; --reader-ink:#4b3a35; --reader-font:'Lora',Georgia,serif;
+  --r-g:#8fb38a; --r-t:#8fa8c9; --r-m:#e0a670; --r-e:#d77a7a; --r-n:#b8aaa0;
+}
+html[data-theme="modern"]{
+  --bg:#f6f7f8; --bg-grad:none;
+  --surface:#ffffff; --card:#ffffff; --card-hover:#fbfbfc; --ink:#121418; --muted:#6b7280; --line:#e5e7eb;
+  --accent:#0f766e; --accent-ink:#fff; --accent-soft:rgba(15,118,110,.10); --chip:#f1f3f5; --chip-ink:#374151; --danger:#c0392b;
+  --font-display:'Inter',system-ui,sans-serif; --font-body:'Inter',system-ui,sans-serif; --ui-size:15px;
+  --radius:10px; --shadow:0 1px 2px rgba(0,0,0,.05),0 6px 20px rgba(0,0,0,.06);
+  --reader-bg:#ffffff; --reader-ink:#1f2328; --reader-font:'Lora',Georgia,serif;
+  --r-g:#3f9d5a; --r-t:#3b82f6; --r-m:#f59e0b; --r-e:#dc2626; --r-n:#9ca3af;
+}
+html[data-theme="bookshelf"]{
+  --bg:#21160e; --bg-grad:linear-gradient(180deg,#2c1d12 0%,#1c120b 100%);
+  --surface:#2b1d13; --card:#372617; --card-hover:#43301d; --ink:#f4e7d2; --muted:#c3a989; --line:#4b3421;
+  --accent:#e2b257; --accent-ink:#2b1c12; --accent-soft:rgba(226,178,87,.15); --chip:#4a3320; --chip-ink:#f0d9b5; --danger:#e07a5f;
+  --font-display:'Playfair Display',Georgia,serif; --font-body:'Lora',Georgia,serif; --ui-size:15px;
+  --radius:4px; --shadow:0 14px 34px rgba(0,0,0,.5);
+  --reader-bg:#f3e9d6; --reader-ink:#3b2a1c; --reader-font:'Lora',Georgia,serif;
+  --r-g:#6f8f55; --r-t:#5f7ea1; --r-m:#c27c3a; --r-e:#a8403a; --r-n:#8a7a68;
+}
+
+/* ---------------- BASE ---------------- */
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%}
+body{background:var(--bg);background-image:var(--bg-grad);background-attachment:fixed;color:var(--ink);font-family:var(--font-body);font-size:var(--ui-size);line-height:1.5;-webkit-font-smoothing:antialiased;transition:background-color .3s,color .3s}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+a{color:var(--accent)}
+svg.i{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none}
+[hidden]{display:none!important}
+.btn{display:inline-flex;align-items:center;gap:.45em;padding:.5em .95em;border-radius:calc(var(--radius) + 2px);border:1px solid var(--line);background:var(--card);color:var(--ink);font-size:.92em;white-space:nowrap;transition:background .15s,border-color .15s,transform .1s}
+.btn:hover{background:var(--card-hover);border-color:var(--accent)}
+.btn:active{transform:scale(.98)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:600}
+.btn.primary:hover{filter:brightness(1.07)}
+.btn.danger{color:var(--danger);border-color:color-mix(in srgb,var(--danger) 40%,var(--line))}
+.btn.ghost{background:transparent;border-color:transparent}
+.btn.ghost:hover{background:var(--accent-soft)}
+.btn.icon{padding:.5em;border-radius:50%}
+.btn:disabled{opacity:.5;cursor:default}
+
+/* ---------------- TOP BAR ---------------- */
+.demo-bar{background:var(--accent);color:var(--accent-ink);font-size:.85em;text-align:center;padding:.4em 1em}
+.topbar{position:sticky;top:0;z-index:30;display:flex;align-items:center;gap:14px;padding:12px 22px;background:color-mix(in srgb,var(--bg) 82%,transparent);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
+.brand{display:flex;flex-direction:column;line-height:1.1;cursor:pointer;min-width:0}
+.brand b{font-family:var(--font-display);font-size:1.55rem;font-weight:600;letter-spacing:.01em;white-space:nowrap}
+.brand small{color:var(--muted);font-size:.78rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.search{flex:1;max-width:560px;margin-left:auto;position:relative}
+.search input{width:100%;padding:.6em 2.2em .6em 2.4em;border-radius:999px;border:1px solid var(--line);background:var(--card);outline:none;transition:border-color .15s,box-shadow .15s}
+.search input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.search .i{position:absolute;left:.85em;top:50%;transform:translateY(-50%);color:var(--muted)}
+.search .clear{position:absolute;right:.4em;top:50%;transform:translateY(-50%);border:0;background:none;color:var(--muted);padding:.3em}
+.menu-btn{display:none}
+.theme-wrap{position:relative}
+.popover{position:absolute;right:0;top:calc(100% + 8px);background:var(--surface);border:1px solid var(--line);border-radius:calc(var(--radius) + 4px);box-shadow:var(--shadow);padding:8px;min-width:230px;z-index:40}
+.popover h4{margin:.3em .6em .5em;font-size:.75em;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:600}
+.theme-opt{display:flex;align-items:center;gap:.7em;width:100%;padding:.55em .6em;border:0;background:none;border-radius:var(--radius);text-align:left}
+.theme-opt:hover,.theme-opt.on{background:var(--accent-soft)}
+.theme-opt .sw{display:flex;border-radius:50%;overflow:hidden;width:26px;height:26px;border:1px solid var(--line);flex:none}
+.theme-opt .sw i{flex:1}
+.theme-opt .check{margin-left:auto;color:var(--accent);visibility:hidden}
+.theme-opt.on .check{visibility:visible}
+
+/* ---------------- LAYOUT ---------------- */
+.layout{display:grid;grid-template-columns:270px minmax(0,1fr);min-height:calc(100vh - 66px)}
+.sidebar{position:sticky;top:66px;height:calc(100vh - 66px);overflow:auto;border-right:1px solid var(--line);padding:18px 10px 18px 14px;display:flex;flex-direction:column;gap:14px}
+.side-h{font-size:.72em;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin:0 .6em;font-weight:600}
+.tree ul{list-style:none;margin:0;padding:0}
+.node{display:flex;align-items:center;gap:.25em;padding:.38em .5em .38em calc(.35em + var(--d,0) * 14px);border-radius:var(--radius);cursor:pointer;color:var(--ink);user-select:none}
+.node:hover{background:var(--accent-soft)}
+.node.on{background:var(--accent-soft);color:var(--accent);font-weight:600}
+.node .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.node .ct{font-size:.78em;color:var(--muted);font-variant-numeric:tabular-nums}
+.caret{border:0;background:none;width:20px;height:20px;padding:0;display:grid;place-items:center;color:var(--muted);transition:transform .15s;flex:none}
+.caret.open{transform:rotate(90deg)}
+.caret-sp{width:20px;flex:none}
+.side-foot{margin-top:auto;border-top:1px solid var(--line);padding-top:12px;display:flex;flex-direction:column;gap:8px}
+.who{display:flex;align-items:center;gap:.6em;font-size:.88em;padding:0 .4em}
+.who img,.who .av{width:30px;height:30px;border-radius:50%;background:var(--accent-soft);display:grid;place-items:center;color:var(--accent);font-weight:700;flex:none}
+.who span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.owner-pill{font-size:.75em;padding:.15em .6em;border-radius:999px;background:var(--accent-soft);color:var(--accent);font-weight:600}
+.scrim{display:none}
+main{padding:26px 34px 90px;min-width:0;position:relative}
+
+/* ---------------- MAIN CONTENT ---------------- */
+.crumbs{display:flex;flex-wrap:wrap;gap:.35em;align-items:center;font-size:.88em;color:var(--muted);margin-bottom:.4em}
+.crumbs a{color:var(--muted);text-decoration:none;cursor:pointer}
+.crumbs a:hover{color:var(--accent)}
+.head{display:flex;flex-wrap:wrap;align-items:flex-end;gap:12px 18px;margin-bottom:22px}
+.head h1{font-family:var(--font-display);font-weight:600;font-size:clamp(1.9rem,3.6vw,2.7rem);line-height:1.1;margin:0;letter-spacing:.005em}
+.head .count{color:var(--muted);font-size:.92em;margin-bottom:.35em}
+.head .actions{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap}
+.section-h{font-family:var(--font-display);font-size:1.25rem;font-weight:600;margin:28px 0 12px;display:flex;align-items:center;gap:.6em}
+.section-h:first-child{margin-top:0}
+.banner{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:12px 16px;border:1px dashed var(--accent);background:var(--accent-soft);border-radius:var(--radius);margin-bottom:20px;font-size:.92em}
+.banner .btn{margin-left:auto}
+
+.folders{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:14px}
+.ftile{position:relative;display:flex;align-items:center;gap:.8em;padding:14px 16px;border-radius:calc(var(--radius) + 2px);background:var(--card);border:1px solid var(--line);cursor:pointer;transition:transform .15s,border-color .15s,background .15s;min-width:0}
+.ftile:hover{transform:translateY(-2px);border-color:var(--accent);background:var(--card-hover)}
+.ftile .fi{width:40px;height:40px;border-radius:var(--radius);background:var(--accent-soft);color:var(--accent);display:grid;place-items:center;flex:none}
+.ftile .fi .i{width:22px;height:22px}
+.ftile b{display:block;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ftile small{color:var(--muted);font-size:.82em}
+.ftile .ft-txt{min-width:0;flex:1}
+.ftile .kebab{position:absolute;top:6px;right:6px;opacity:.0;transition:opacity .15s}
+.ftile:hover .kebab,.ftile:focus-within .kebab{opacity:1}
+.ftile.add{border-style:dashed;background:transparent;color:var(--muted);justify-content:center}
+.ftile.add:hover{color:var(--accent)}
+
+.toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin:26px 0 16px}
+.toolbar .section-h{margin:0 auto 0 0}
+.sel{padding:.42em 2em .42em .8em;border-radius:999px;border:1px solid var(--line);background:var(--card) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23999' stroke-width='2.5'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") no-repeat right .7em center;appearance:none;-webkit-appearance:none;font-size:.88em;cursor:pointer}
+.toggle{display:inline-flex;align-items:center;gap:.5em;font-size:.88em;color:var(--muted);cursor:pointer;user-select:none}
+.toggle input{accent-color:var(--accent);width:16px;height:16px}
+
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:18px}
+.card{position:relative;display:flex;flex-direction:column;background:var(--card);border:1px solid var(--line);border-radius:calc(var(--radius) + 2px);cursor:pointer;transition:transform .18s,box-shadow .18s,border-color .18s,background .18s;overflow:hidden;outline:none}
+.card:hover,.card:focus-visible{transform:translateY(-3px);box-shadow:var(--shadow);border-color:color-mix(in srgb,var(--accent) 55%,var(--line));background:var(--card-hover)}
+.card::before{content:"";height:4px;background:var(--spine);opacity:.85}
+.card-body{padding:16px 18px 16px;display:flex;flex-direction:column;gap:8px;flex:1}
+.card-top{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.rating{display:inline-grid;place-items:center;min-width:22px;height:22px;padding:0 6px;border-radius:5px;font:700 .72rem/1 'Inter',system-ui,sans-serif;color:#fff;letter-spacing:.02em}
+.r-g{background:var(--r-g)}.r-t{background:var(--r-t)}.r-m{background:var(--r-m)}.r-e{background:var(--r-e)}.r-n{background:var(--r-n)}
+.fmt{font:600 .66rem/1 'Inter',system-ui,sans-serif;letter-spacing:.06em;padding:5px 6px;border-radius:5px;border:1px solid var(--line);color:var(--muted)}
+.done{font-size:.75em;color:var(--muted);margin-left:auto}
+.wip{font-size:.75em;color:var(--accent);margin-left:auto}
+.card h3{font-family:var(--font-display);font-size:1.32rem;line-height:1.18;margin:2px 0 0;font-weight:600}
+.by{color:var(--muted);font-size:.9em;margin-top:-4px}
+.tags{display:flex;flex-wrap:wrap;gap:5px}
+.chip{font-size:.76em;padding:.2em .6em;border-radius:999px;background:var(--chip);color:var(--chip-ink);max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;border:0}
+button.chip{cursor:pointer}
+button.chip:hover{outline:1px solid var(--accent)}
+.sum{margin:0;color:color-mix(in srgb,var(--ink) 82%,var(--muted));font-size:.92em;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.stats{margin-top:auto;padding-top:4px;font-size:.8em;color:var(--muted);display:flex;gap:.4em;flex-wrap:wrap}
+.spine{display:none}
+.empty{text-align:center;padding:60px 20px;color:var(--muted);border:1px dashed var(--line);border-radius:calc(var(--radius) + 4px)}
+.empty b{display:block;font-family:var(--font-display);font-size:1.4rem;color:var(--ink);margin-bottom:.3em;font-weight:600}
+
+.node.dim{opacity:.45}
+.ftile[data-col] b{white-space:normal;line-height:1.2}
+.ftile[data-col]{padding:12px 14px}
+.col-note{display:flex;gap:.5em;align-items:flex-start;color:var(--muted);font-size:.92em;margin:-8px 0 18px}
+.col-note .i{color:var(--accent);margin-top:.15em}
+.cloud{display:flex;flex-wrap:wrap;gap:7px}
+.chip.big{font-size:.84em;padding:.35em .8em}
+.chip.big span{opacity:.6;margin-left:.2em;font-size:.9em}
+/* continue reading */
+.resume{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px}
+.rcard{display:flex;gap:12px;align-items:center;padding:12px 14px;border-radius:calc(var(--radius) + 2px);background:var(--card);border:1px solid var(--line);cursor:pointer;transition:border-color .15s,transform .15s;text-align:left;min-width:0}
+.rcard:hover{border-color:var(--accent);transform:translateY(-2px)}
+.rcard .mini{width:30px;height:44px;border-radius:3px;background:var(--spine);flex:none;box-shadow:inset -3px 0 0 rgba(0,0,0,.18)}
+.rcard b{display:block;font-family:var(--font-display);font-size:1.05rem;line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rcard small{color:var(--muted);font-size:.8em}
+.rcard div{min-width:0}
+
+/* ---------------- BOOKSHELF LAYOUT ---------------- */
+html[data-theme="bookshelf"] .grid{display:flex;flex-wrap:wrap;align-items:flex-end;gap:0 5px;padding:0 18px;background-image:linear-gradient(to bottom,transparent 250px,#7a5230 250px,#5a3a20 258px,#3b2614 266px,rgba(0,0,0,.35) 266px,transparent 278px);background-size:100% 284px;border-radius:6px}
+html[data-theme="bookshelf"] .card{height:284px;padding:0 0 34px;background:none;border:0;overflow:visible;flex-direction:row;align-items:flex-end;box-shadow:none}
+html[data-theme="bookshelf"] .card::before{display:none}
+html[data-theme="bookshelf"] .card:hover,html[data-theme="bookshelf"] .card:focus-visible{transform:none;box-shadow:none;background:none}
+html[data-theme="bookshelf"] .card-body{display:none}
+html[data-theme="bookshelf"] .spine{display:flex;flex-direction:column;align-items:center;justify-content:space-between;width:var(--spine-w);height:var(--spine-h);padding:16px 0 12px;border-radius:3px 3px 1px 1px;background:linear-gradient(90deg,rgba(0,0,0,.28) 0%,rgba(255,255,255,.10) 18%,rgba(255,255,255,.02) 50%,rgba(0,0,0,.25) 100%),var(--spine);box-shadow:inset 0 10px 0 -6px rgba(226,178,87,.55),inset 0 -12px 0 -8px rgba(226,178,87,.5),2px 0 3px rgba(0,0,0,.35);color:#f6ead3;transition:transform .2s;position:relative}
+html[data-theme="bookshelf"] .card:hover .spine,html[data-theme="bookshelf"] .card:focus-visible .spine{transform:translateY(-10px)}
+.sp-title{writing-mode:vertical-rl;transform:rotate(180deg);font-family:'Playfair Display',Georgia,serif;font-weight:600;font-size:.92rem;line-height:1.05;max-height:calc(var(--spine-h) - 70px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-shadow:0 1px 1px rgba(0,0,0,.4)}
+.sp-author{writing-mode:vertical-rl;transform:rotate(180deg);font-size:.66rem;opacity:.75;max-height:46px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.sp-r{width:8px;height:8px;border-radius:50%;position:absolute;bottom:4px;left:50%;transform:translateX(-50%)}
+html[data-theme="bookshelf"] .ftile{background:linear-gradient(180deg,#4a3220,#3a2617);border-color:#5b3e26}
+
+/* ---------------- MODAL / DIALOG ---------------- */
+.overlay{position:fixed;inset:0;z-index:60;background:rgba(10,8,6,.55);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);display:grid;place-items:center;padding:20px;animation:fade .18s}
+@keyframes fade{from{opacity:0}}
+@keyframes rise{from{opacity:0;transform:translateY(14px)}}
+.sheet{width:min(760px,100%);max-height:calc(100vh - 40px);overflow:auto;background:var(--surface);border:1px solid var(--line);border-radius:calc(var(--radius) + 8px);box-shadow:var(--shadow);animation:rise .22s}
+.sheet.small{width:min(460px,100%)}
+.sheet-h{position:sticky;top:0;background:var(--surface);display:flex;align-items:flex-start;gap:12px;padding:22px 24px 14px;border-bottom:1px solid var(--line);z-index:1}
+.sheet-h h2{font-family:var(--font-display);font-size:1.75rem;line-height:1.15;margin:0;font-weight:600}
+.sheet-h .by{margin-top:.25em}
+.sheet-h .x{margin-left:auto}
+.sheet-b{padding:18px 24px 24px}
+.meta-grid{display:grid;grid-template-columns:max-content 1fr;gap:9px 16px;font-size:.92em;margin:0 0 18px}
+.meta-grid dt{color:var(--muted)}
+.meta-grid dd{margin:0;display:flex;flex-wrap:wrap;gap:5px}
+.summary{white-space:pre-line;margin:0 0 18px;padding:14px 16px;border-left:3px solid var(--accent);background:var(--accent-soft);border-radius:0 var(--radius) var(--radius) 0}
+.btn-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
+.owner-row{border-top:1px solid var(--line);margin-top:18px;padding-top:14px}
+.owner-row .lbl{font-size:.72em;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);font-weight:600;margin-bottom:8px}
+.loading-line{color:var(--muted);font-style:italic;font-size:.9em;margin-bottom:12px}
+.field{display:flex;flex-direction:column;gap:5px;margin-bottom:14px;font-size:.9em}
+.field span{color:var(--muted)}
+.field input,.field select,.field textarea{padding:.6em .75em;border-radius:var(--radius);border:1px solid var(--line);background:var(--card);outline:none}
+.field input:focus,.field select:focus,.field textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.dlg-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:8px}
+.dlg-text{margin:0 0 16px;color:color-mix(in srgb,var(--ink) 85%,var(--muted))}
+
+/* ---------------- TOASTS ---------------- */
+.toasts{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);z-index:90;display:flex;flex-direction:column;gap:8px;align-items:center;pointer-events:none;width:min(520px,calc(100vw - 24px))}
+.toast{pointer-events:auto;background:var(--ink);color:var(--bg);padding:.7em 1.1em;border-radius:12px;box-shadow:var(--shadow);font-size:.9em;display:flex;gap:10px;align-items:center;animation:rise .2s;max-width:100%}
+.toast button{background:none;border:1px solid currentColor;color:inherit;border-radius:8px;padding:.2em .7em;font-size:.9em}
+
+/* drop zone */
+.dropzone{position:fixed;inset:0;z-index:55;display:grid;place-items:center;background:color-mix(in srgb,var(--bg) 80%,transparent);border:3px dashed var(--accent);font-family:var(--font-display);font-size:2rem;color:var(--accent);pointer-events:none}
+
+/* ---------------- SIGN-IN ---------------- */
+.gate{min-height:100vh;display:grid;place-items:center;padding:24px}
+.gate-card{text-align:center;max-width:440px;padding:44px 36px;background:var(--surface);border:1px solid var(--line);border-radius:calc(var(--radius) + 10px);box-shadow:var(--shadow)}
+.gate-card .crest{width:64px;height:64px;margin:0 auto 14px;border-radius:50%;display:grid;place-items:center;background:var(--accent-soft);color:var(--accent)}
+.gate-card .crest .i{width:30px;height:30px}
+.gate-card h1{font-family:var(--font-display);font-weight:600;font-size:2.4rem;margin:0 0 .2em}
+.gate-card p{color:var(--muted);margin:0 0 1.4em}
+.gate-card .err{color:var(--danger);font-size:.9em;margin-top:1em}
+.gate-themes{display:flex;justify-content:center;gap:8px;margin-top:22px}
+.gate-themes button{width:26px;height:26px;border-radius:50%;border:2px solid var(--line);padding:0;overflow:hidden;display:flex}
+.gate-themes button.on{border-color:var(--accent)}
+.gate-themes i{flex:1}
+.skel{height:180px;border-radius:calc(var(--radius) + 2px);background:linear-gradient(90deg,var(--card) 0%,var(--card-hover) 50%,var(--card) 100%);background-size:200% 100%;animation:shimmer 1.3s infinite;border:1px solid var(--line)}
+@keyframes shimmer{to{background-position:-200% 0}}
+
+/* ---------------- READER ---------------- */
+.reader{position:fixed;inset:0;z-index:80;background:var(--reader-bg);color:var(--reader-ink);display:flex;flex-direction:column}
+.r-bar{display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid color-mix(in srgb,var(--reader-ink) 12%,transparent);background:var(--reader-bg)}
+.r-bar .btn{background:transparent;border-color:transparent;color:var(--reader-ink)}
+.r-bar .btn:hover{background:color-mix(in srgb,var(--reader-ink) 8%,transparent)}
+.r-title{min-width:0;flex:1;line-height:1.2}
+.r-title b{display:block;font-family:var(--font-display);font-size:1.12rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.r-title small{opacity:.65;font-size:.8em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block}
+.r-chap{max-width:220px;background-color:transparent;color:var(--reader-ink);border-color:color-mix(in srgb,var(--reader-ink) 18%,transparent)}
+.r-body{flex:1;position:relative;min-height:0}
+.r-body iframe{border:0;width:100%;height:100%;display:block;background:var(--reader-bg)}
+#epubView{position:absolute;inset:0 0 54px 0}
+.r-nav{position:absolute;left:0;right:0;bottom:0;height:54px;display:flex;align-items:center;justify-content:center;gap:18px;border-top:1px solid color-mix(in srgb,var(--reader-ink) 10%,transparent)}
+.r-nav .btn{background:transparent;color:var(--reader-ink);border-color:color-mix(in srgb,var(--reader-ink) 18%,transparent)}
+.r-loading{position:absolute;inset:0;display:grid;place-items:center;opacity:.7;font-style:italic}
+.r-msg{max-width:460px;margin:12vh auto;text-align:center;padding:0 20px}
+
+/* ---------------- MOBILE ---------------- */
+@media (max-width:860px){
+  .layout{grid-template-columns:1fr}
+  .sidebar{position:fixed;left:0;top:0;bottom:0;height:auto;width:min(84vw,320px);z-index:50;background:var(--surface);transform:translateX(-102%);transition:transform .25s ease;box-shadow:var(--shadow);padding-top:22px}
+  body.nav-open .sidebar{transform:none}
+  body.nav-open .scrim{display:block;position:fixed;inset:0;z-index:45;background:rgba(0,0,0,.4)}
+  .menu-btn{display:inline-flex}
+  main{padding:18px 16px 90px}
+  .topbar{flex-wrap:wrap;padding:10px 14px;gap:8px 10px}
+  .search{order:5;flex-basis:100%;max-width:none}
+  .theme-wrap{margin-left:auto}
+  .grid{grid-template-columns:1fr}
+  .sheet{max-height:92vh;align-self:end;border-radius:calc(var(--radius) + 10px) calc(var(--radius) + 10px) 0 0}
+  .overlay{padding:0;place-items:end stretch}
+  .sheet,.sheet.small{width:100%}
+  .head .actions{margin-left:0}
+  .ftile .kebab{opacity:1}
+  .r-chap{max-width:130px}
+  html[data-theme="bookshelf"] .grid{padding:0 8px}
+}
+@media (max-width:420px){ .brand small{display:none} .folders{grid-template-columns:1fr 1fr} }
+@media (prefers-reduced-motion:reduce){ *{animation:none!important;transition:none!important} }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div class="toasts" id="toasts"></div>
+<input type="file" id="fileInput" multiple accept=".epub,.html,.htm,.pdf,.mobi,.azw3" hidden>
+
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/epubjs@0.3.93/dist/epub.min.js"></script>
+<script>
+'use strict';
+/* =================================================================
+   Fanfic Library — GitHub Pages front end, Google Drive back end
+   ================================================================= */
+const FOLDER = 'application/vnd.google-apps.folder';
+const READ_SCOPE = 'https://www.googleapis.com/auth/drive.readonly';
+const WRITE_SCOPE = 'https://www.googleapis.com/auth/drive';
+const FIELDS = 'id,name,mimeType,parents,size,createdTime,modifiedTime,description';
+const DEMO = !CONFIG.clientId || !CONFIG.rootFolderId || /[?&]demo\b/.test(location.search);
+const FONTS_URL = 'https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,600;1,400&family=Lora:ital,wght@0,400;0,600;1,400&family=Inter:wght@400;600&display=swap';
+const THEMES = [
+  { id: 'academia',  name: 'Dark Academia',  sw: ['#13110e', '#c39c5c', '#1b2820'] },
+  { id: 'cozy',      name: 'Soft & Cozy',    sw: ['#fbf5ee', '#d0858b', '#f8e6e1'] },
+  { id: 'modern',    name: 'Clean & Modern', sw: ['#ffffff', '#0f766e', '#e5e7eb'] },
+  { id: 'bookshelf', name: 'Bookshelf',      sw: ['#2c1d12', '#e2b257', '#7a2e2e'] }
+];
+const SPINES = ['#7a2e2e', '#2f4a3a', '#2b3d5c', '#5c3b2b', '#6b5a2b', '#3d2b4f', '#8a4f2a', '#2b5452', '#5a2b3f', '#46512b', '#3b4a63', '#6e3a3a'];
+const RLABEL = { g: 'G', t: 'T', m: 'M', e: 'E', n: '?' };
+const RNAME = { g: 'General', t: 'Teen', m: 'Mature', e: 'Explicit', n: 'Not Rated' };
+const READABLE = ['epub', 'html'];
+const COLS = (CONFIG.collections || []).map(c => ({ ...c, slug: String(c.name).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''), kw: (c.tags || []).map(t => String(t).toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()), ex: (c.exclude || []).map(t => String(t).toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()) }));
+
+/* ---------- tiny helpers ---------- */
+const $ = (s, el = document) => el.querySelector(s);
+const $$ = (s, el = document) => [...el.querySelectorAll(s)];
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const norm = s => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+const fmtNum = n => Number(n).toLocaleString();
+const hash = s => { let h = 2166136261; for (const c of String(s)) { h ^= c.charCodeAt(0); h = Math.imul(h, 16777619); } return h >>> 0; };
+const ls = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} }
+};
+const throttle = (fn, ms) => { let t = 0, timer; return (...a) => { clearTimeout(timer); const now = Date.now(); if (now - t > ms) { t = now; fn(...a); } else timer = setTimeout(() => { t = Date.now(); fn(...a); }, ms); }; };
+const ICONS = {
+  menu: '<path d="M3 6h18M3 12h18M3 18h18"/>',
+  search: '<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>',
+  palette: '<path d="M12 3a9 9 0 1 0 0 18c1.1 0 1.6-.8 1.6-1.6 0-.5-.2-.8-.4-1.1-.3-.3-.4-.6-.4-1 0-.9.7-1.5 1.6-1.5H16a5 5 0 0 0 5-5c0-4.3-4-7.8-9-7.8z"/><circle cx="7.5" cy="11" r="1.1"/><circle cx="10.5" cy="7" r="1.1"/><circle cx="15" cy="7.5" r="1.1"/>',
+  folder: '<path d="M3 7.5A2.5 2.5 0 0 1 5.5 5H9l2 2.2h7.5A2.5 2.5 0 0 1 21 9.7v7.8a2.5 2.5 0 0 1-2.5 2.5h-13A2.5 2.5 0 0 1 3 17.5z"/>',
+  upload: '<path d="M12 15V4m0 0L8 8m4-4 4 4M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/>',
+  plus: '<path d="M12 5v14M5 12h14"/>',
+  x: '<path d="M6 6l12 12M18 6 6 18"/>',
+  download: '<path d="M12 4v11m0 0-4-4m4 4 4-4M4 20h16"/>',
+  book: '<path d="M4 19.5V5a2 2 0 0 1 2-2h13v15H6a2 2 0 0 0-2 2zm0 0A1.5 1.5 0 0 0 5.5 21H19"/>',
+  trash: '<path d="M4 7h16M9 7V4.5h6V7M6.5 7l1 13h9l1-13"/>',
+  move: '<path d="M3 7.5A2.5 2.5 0 0 1 5.5 5H9l2 2.2h7.5A2.5 2.5 0 0 1 21 9.7v7.8a2.5 2.5 0 0 1-2.5 2.5h-13A2.5 2.5 0 0 1 3 17.5z"/><path d="M9 13.5h6m-2.2-2.3 2.3 2.3-2.3 2.3"/>',
+  edit: '<path d="M4 20h4L19 9l-4-4L4 16z"/>',
+  dots: '<circle cx="12" cy="5" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="12" cy="19" r="1.3"/>',
+  left: '<path d="M15 6l-6 6 6 6"/>',
+  right: '<path d="M9 6l6 6-6 6"/>',
+  back: '<path d="M19 12H5m6-6-6 6 6 6"/>',
+  ext: '<path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/>',
+  spark: '<path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5 18 18M6 18l2.5-2.5M15.5 8.5 18 6"/>',
+  check: '<path d="m5 12 5 5 9-10"/>',
+  tag: '<path d="M3 12.2V4.5A1.5 1.5 0 0 1 4.5 3h7.7l8.8 8.8-9.2 9.2z"/><circle cx="8" cy="8" r="1.4"/>',
+  lock: '<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>',
+  textsize: '<path d="M4 18 9 6l5 12M5.8 14h6.4M15 18l3-7 3 7M15.8 16h4.4"/>'
+};
+const icon = (n, cls = '') => `<svg class="i ${cls}" viewBox="0 0 24 24" aria-hidden="true">${ICONS[n] || ''}</svg>`;
+
+/* ---------- app state ---------- */
+const S = {
+  store: null, user: null, root: null,
+  folders: new Map(), files: [], groups: [], groupByKey: new Map(), groupByFile: new Map(), counts: new Map(),
+  current: null, view: { type: 'folder' }, colCounts: new Map(), topTags: [], query: '', sort: 'added', rating: 'all', fmt: 'all', includeSub: true,
+  canEdit: false, editing: false, open: new Set(),
+  metaCache: ls.get('fanlib:meta', {}), prefs: {}, reading: null, book: null, rend: null, toc: []
+};
+
+/* ---------- per-user preferences (theme, reader font, progress) ---------- */
+const userKey = () => (S.user && S.user.emailAddress) || 'guest';
+const prefs = {
+  load() {
+    S.prefs = Object.assign({ theme: ls.get('fanlib:lastTheme', CONFIG.defaultTheme), fontSize: 19, readerFont: 'theme' }, ls.get('fanlib:prefs:' + userKey(), {}));
+    applyTheme(S.prefs.theme);
+  },
+  save() { ls.set('fanlib:prefs:' + userKey(), S.prefs); ls.set('fanlib:lastTheme', S.prefs.theme); }
+};
+function applyTheme(id) {
+  if (!THEMES.some(t => t.id === id)) id = 'academia';
+  document.documentElement.dataset.theme = id;
+  S.prefs.theme = id;
+}
+const progress = {
+  all() { return ls.get('fanlib:progress:' + userKey(), {}); },
+  get(id) { return this.all()[id]; },
+  set(id, data) { const a = this.all(); a[id] = Object.assign(a[id] || {}, data, { at: Date.now() }); ls.set('fanlib:progress:' + userKey(), a); }
+};
+
+/* =================================================================
+   METADATA — parse AO3 downloads (HTML + EPUB)
+   ================================================================= */
+const META_TAG = 'fanlib:';
+function parseDesc(d) { if (!d || !d.startsWith(META_TAG)) return null; try { return JSON.parse(d.slice(META_TAG.length)); } catch { return null; } }
+function packMeta(m) {
+  const c = { ...m }; delete c.guess;
+  if (c.s && c.s.length > 1500) c.s = c.s.slice(0, 1500) + '…';
+  for (const k of ['f', 'p', 'x', 'g', 'wr', 'cat']) if (Array.isArray(c[k])) c[k] = c[k].slice(0, 40);
+  c.v = 1;
+  return META_TAG + JSON.stringify(c);
+}
+const extOf = name => (String(name).match(/\.([a-z0-9]+)$/i) || [, ''])[1].toLowerCase();
+function fmtOf(f) {
+  const e = extOf(f.name);
+  if (e === 'htm' || e === 'html' || f.mimeType === 'text/html') return 'html';
+  if (e === 'epub' || f.mimeType === 'application/epub+zip') return 'epub';
+  return e || 'file';
+}
+const isFic = f => f.mimeType !== FOLDER && ['html', 'epub', 'pdf', 'mobi', 'azw3'].includes(fmtOf(f));
+function guessMime(name) { return { epub: 'application/epub+zip', html: 'text/html', htm: 'text/html', pdf: 'application/pdf', mobi: 'application/x-mobipocket-ebook', azw3: 'application/vnd.amazon.ebook' }[extOf(name)] || 'application/octet-stream'; }
+function metaFromName(name) {
+  const base = String(name).replace(/\.[a-z0-9]+$/i, '').replace(/_/g, ' ').replace(/\s+/g, ' ').trim();
+  const m = base.match(/^(.*?)\s+-\s+(.*)$/);
+  return m ? { t: m[1], a: m[2], guess: true } : { t: base, a: '', guess: true };
+}
+const textOf = el => (el && el.textContent || '').replace(/\s+/g, ' ').trim();
+function blockText(el) { const ps = $$('p', el).map(textOf).filter(Boolean); return (ps.length ? ps.join('\n\n') : textOf(el)).trim(); }
+function htmlToText(s) { const d = new DOMParser().parseFromString(s, 'text/html'); return blockText(d.body); }
+function parseStats(txt, m) {
+  let x;
+  if ((x = txt.match(/Words:\s*([\d,.]+)/))) m.w = +x[1].replace(/[,.]/g, '');
+  if ((x = txt.match(/Chapters:\s*(\d+)\s*\/\s*(\d+|\?)/))) { m.c = x[1] + '/' + x[2]; m.k = x[2] !== '?' && x[1] === x[2]; }
+  if ((x = txt.match(/Published:\s*(\d{4}-\d{2}-\d{2})/))) m.d = x[1];
+  if ((x = txt.match(/(?:Completed|Updated):\s*(\d{4}-\d{2}-\d{2})/))) m.up = x[1];
+}
+function parseAo3Doc(doc, raw) {
+  const m = {};
+  const pre = doc.querySelector('#preface') || doc.body || doc;
+  const h1 = pre.querySelector('.meta h1, h1, h2.title'); if (h1 && textOf(h1)) m.t = textOf(h1);
+  const authors = $$('a[rel="author"]', pre).map(textOf).filter(Boolean);
+  if (authors.length) m.a = [...new Set(authors)].join(', ');
+  else { const by = pre.querySelector('.byline'); if (by) m.a = textOf(by).replace(/^by\s+/i, ''); }
+  const dl = pre.querySelector('dl.tags') || doc.querySelector('dl.tags');
+  if (dl) for (const dt of $$('dt', dl)) {
+    const dd = dt.nextElementSibling; if (!dd || dd.tagName !== 'DD') continue;
+    const label = textOf(dt).replace(/:$/, '').toLowerCase();
+    const links = $$('a', dd).map(textOf).filter(Boolean);
+    const list = links.length ? links : textOf(dd).split(/,\s*/).filter(Boolean);
+    if (label.startsWith('rating')) m.r = list[0];
+    else if (label.startsWith('archive warning')) m.wr = list;
+    else if (label.startsWith('categor')) m.cat = list;
+    else if (label.startsWith('fandom')) m.f = list;
+    else if (label.startsWith('relationship')) m.p = list;
+    else if (label.startsWith('character')) m.x = list;
+    else if (label.startsWith('additional tag') || label === 'freeform') m.g = list;
+    else if (label.startsWith('series')) m.ser = textOf(dd);
+    else if (label.startsWith('stats')) parseStats(textOf(dd), m);
+  }
+  let sum = null;
+  for (const p of $$('p, h2, h3, b, strong', pre)) {
+    if (/^summary:?$/i.test(textOf(p))) {
+      let n = (p.tagName === 'B' || p.tagName === 'STRONG') && p.parentElement.tagName === 'P' ? p.parentElement.nextElementSibling : p.nextElementSibling;
+      while (n && n.tagName !== 'BLOCKQUOTE' && !(n.classList && n.classList.contains('userstuff'))) n = n.nextElementSibling;
+      sum = n; break;
+    }
+  }
+  if (!sum) sum = pre.querySelector('blockquote.userstuff');
+  if (sum) m.s = blockText(sum);
+  const src = raw || (doc.documentElement && doc.documentElement.innerHTML) || '';
+  const w = src.match(/archiveofourown\.org\/works\/(\d+)/);
+  if (w) m.u = 'https://archiveofourown.org/works/' + w[1];
+  if (!m.w) { const st = textOf(pre).match(/Words:\s*([\d,]+)/); if (st) m.w = +st[1].replace(/,/g, ''); }
+  return m;
+}
+async function parseEpub(buf) {
+  const zip = await JSZip.loadAsync(buf); const m = {};
+  try {
+    const cont = await zip.file('META-INF/container.xml')?.async('string');
+    const opfPath = cont && new DOMParser().parseFromString(cont, 'application/xml').querySelector('rootfile')?.getAttribute('full-path');
+    if (opfPath && zip.file(opfPath)) {
+      const opf = new DOMParser().parseFromString(await zip.file(opfPath).async('string'), 'application/xml');
+      const DC = 'http://purl.org/dc/elements/1.1/';
+      const g = t => [...opf.getElementsByTagNameNS(DC, t)].map(e => e.textContent.trim()).filter(Boolean);
+      const t = g('title'); if (t[0]) m.t = t[0];
+      const c = g('creator'); if (c.length) m.a = c.join(', ');
+      const subj = g('subject'); if (subj.length) m.g = subj;
+      const d = g('description'); if (d[0]) m.s = htmlToText(d[0]);
+      const w = g('source').concat(g('identifier')).join(' ').match(/archiveofourown\.org\/works\/(\d+)/);
+      if (w) m.u = 'https://archiveofourown.org/works/' + w[1];
+    }
+  } catch (e) { console.warn('OPF parse failed', e); }
+  const htmlNames = Object.keys(zip.files).filter(n => /\.x?html?$/i.test(n)).sort();
+  let pf = htmlNames.find(n => /preface/i.test(n));
+  if (!pf) for (const n of htmlNames.slice(0, 4)) { const t = await zip.file(n).async('string'); if (/class="tags"/.test(t)) { pf = n; break; } }
+  if (pf) {
+    const txt = await zip.file(pf).async('string');
+    const pm = parseAo3Doc(new DOMParser().parseFromString(txt, 'text/html'), txt);
+    for (const [k, v] of Object.entries(pm)) if (v != null && v !== '' && !(Array.isArray(v) && !v.length)) m[k] = v;
+  }
+  return m;
+}
+async function parseBytes(buf, name) {
+  const f = fmtOf({ name });
+  let m = {};
+  try {
+    if (f === 'epub') m = await parseEpub(buf);
+    else if (f === 'html') { const txt = new TextDecoder().decode(buf); m = parseAo3Doc(new DOMParser().parseFromString(txt, 'text/html'), txt); }
+  } catch (e) { console.warn('parse failed', name, e); }
+  const base = metaFromName(name); delete base.guess;
+  return Object.assign(base, Object.fromEntries(Object.entries(m).filter(([, v]) => v != null && v !== '')));
+}
+function ratingKey(r) {
+  if (!r) return '';
+  if (/general/i.test(r)) return 'g'; if (/teen/i.test(r)) return 't'; if (/mature/i.test(r)) return 'm'; if (/explicit/i.test(r)) return 'e';
+  return 'n';
+}
+
+/* =================================================================
+   GOOGLE SIGN-IN + DRIVE STORE
+   ================================================================= */
+class AuthError extends Error { constructor() { super('Your sign-in expired.'); this.auth = true; } }
+const auth = {
+  token: null, exp: 0, scope: '',
+  restore() { try { const j = JSON.parse(sessionStorage.getItem('fanlib:tok')); if (j && j.exp > Date.now() + 60000) Object.assign(this, j); } catch {} },
+  valid() { return !!this.token && this.exp > Date.now() + 30000; },
+  hasWrite() { return this.scope.split(' ').includes(WRITE_SCOPE); },
+  save() { try { sessionStorage.setItem('fanlib:tok', JSON.stringify({ token: this.token, exp: this.exp, scope: this.scope })); } catch {} },
+  clear() { this.token = null; this.exp = 0; this.scope = ''; try { sessionStorage.removeItem('fanlib:tok'); } catch {} },
+  request(write) {
+    return new Promise((resolve, reject) => {
+      if (!(window.google && google.accounts && google.accounts.oauth2)) return reject(new Error('Google sign-in is still loading. Try again in a moment.'));
+      const scope = write ? READ_SCOPE + ' ' + WRITE_SCOPE : READ_SCOPE;
+      const client = google.accounts.oauth2.initTokenClient({
+        client_id: CONFIG.clientId, scope, include_granted_scopes: true,
+        hint: S.user && S.user.emailAddress || undefined,
+        callback: r => {
+          if (r.error) return reject(new Error(r.error_description || r.error));
+          this.token = r.access_token; this.exp = Date.now() + (+r.expires_in || 3600) * 1000; this.scope = r.scope || scope;
+          this.save(); resolve();
+        },
+        error_callback: e => reject(new Error(e && e.type === 'popup_closed' ? 'The sign-in window was closed.' : (e && (e.message || e.type)) || 'Sign-in failed.'))
+      });
+      client.requestAccessToken({ prompt: '' });
+    });
+  }
+};
+class DriveStore {
+  async req(path, opts = {}, upload = false) {
+    const url = (upload ? 'https://www.googleapis.com/upload/drive/v3' : 'https://www.googleapis.com/drive/v3') + path;
+    const res = await fetch(url, { ...opts, headers: { Authorization: 'Bearer ' + auth.token, ...(opts.headers || {}) } });
+    if (res.status === 401) { auth.clear(); throw new AuthError(); }
+    if (!res.ok) {
+      let msg = res.status + ' ' + res.statusText;
+      try { const j = await res.json(); msg = (j.error && j.error.message) || msg; } catch {}
+      const err = new Error(msg); err.status = res.status; throw err;
+    }
+    return res;
+  }
+  async user() { return (await (await this.req('/about?fields=user(displayName,emailAddress,photoLink)')).json()).user; }
+  async getRoot() { return (await this.req(`/files/${encodeURIComponent(CONFIG.rootFolderId)}?fields=id,name,capabilities(canAddChildren,canEdit)&supportsAllDrives=true`)).json(); }
+  async listChildren(id) {
+    const out = []; let page = '';
+    do {
+      const q = encodeURIComponent(`'${id}' in parents and trashed=false`);
+      const j = await (await this.req(`/files?q=${q}&fields=nextPageToken,files(${FIELDS})&pageSize=1000&supportsAllDrives=true&includeItemsFromAllDrives=true${page ? '&pageToken=' + encodeURIComponent(page) : ''}`)).json();
+      out.push(...j.files); page = j.nextPageToken;
+    } while (page);
+    return out;
+  }
+  async getBytes(id) { return (await this.req(`/files/${id}?alt=media&supportsAllDrives=true`)).arrayBuffer(); }
+  async createFolder(name, parent) {
+    return (await this.req(`/files?fields=${FIELDS}&supportsAllDrives=true`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, mimeType: FOLDER, parents: [parent] }) })).json();
+  }
+  async upload(file, parent, description) {
+    const meta = { name: file.name, parents: [parent], description };
+    const b = 'fanlib' + Math.random().toString(36).slice(2);
+    const body = new Blob([
+      `--${b}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(meta)}\r\n--${b}\r\nContent-Type: ${file.type || guessMime(file.name)}\r\n\r\n`,
+      file, `\r\n--${b}--`
+    ]);
+    return (await this.req(`/files?uploadType=multipart&supportsAllDrives=true&fields=${FIELDS}`, { method: 'POST', headers: { 'Content-Type': 'multipart/related; boundary=' + b }, body }, true)).json();
+  }
+  async patch(id, body, extra = '') {
+    return (await this.req(`/files/${id}?fields=${FIELDS}&supportsAllDrives=true${extra}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) })).json();
+  }
+  rename(id, name) { return this.patch(id, { name }); }
+  move(id, to, from) { return this.patch(id, {}, `&addParents=${to}&removeParents=${from}`); }
+  trash(id) { return this.patch(id, { trashed: true }); }
+  setDescription(id, d) { return this.patch(id, { description: d }); }
+  isSample() { return false; }
+}
+
+/* =================================================================
+   DEMO STORE — sample library so you can try everything first
+   ================================================================= */
+const DEMO_PARAS = [
+  'The rain had been falling since before dawn, the slow, patient kind that settles into stone and stays there. She had told herself she would only stay an hour. That had been three hours and two pots of tea ago.',
+  'He did not look up when the door opened, which was its own kind of answer. The lamplight caught the edge of his jaw, the ink on his fingers, the stack of parchment he had clearly been pretending not to finish.',
+  '“You’re in my chair,” she said. “It isn’t your chair,” he replied, turning a page with deliberate care. “It has never been your chair. You simply sit in it with more conviction than anyone else.”',
+  'Outside, the lake had gone the colour of old pewter. Somewhere far below, a staircase changed its mind with a groan, and the portraits muttered about the draught as they always did.',
+  'It was not forgiveness, exactly. It was something smaller and harder to name: the decision to keep showing up, to set two cups on the table instead of one, to let the silence be something other than a wall.',
+  'She found the letter tucked inside the third volume, folded twice, the handwriting cramped as if the writer had been afraid of running out of room. She read it standing up. Then she sat down and read it again.',
+  'By the time the snow came, they had built a routine out of arguments and shared notes and the particular way he slid the sugar across the table without being asked. Neither of them called it anything. Naming it felt like tempting fate.',
+  'There is a kind of quiet that only happens late at night in old libraries, when the shelves seem to lean closer and every turned page sounds like a confession. They had both, separately, learned to love it.'
+];
+function demoHtml(it) {
+  const m = parseDesc(it.description) || metaFromName(it.name);
+  const chapters = Math.min(3, parseInt(m.c) || 1);
+  let body = '';
+  for (let c = 1; c <= chapters; c++) {
+    body += `<h2 class="toc-heading">Chapter ${c}</h2><div class="userstuff">`;
+    for (let p = 0; p < 7; p++) body += `<p>${DEMO_PARAS[(c * 3 + p + hash(m.t)) % DEMO_PARAS.length]}</p>`;
+    body += '</div><hr/>';
+  }
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${esc(m.t)}</title></head><body>
+<div id="preface"><p class="message"><b>${esc(m.t)}</b><br/>A sample fic for the demo library. Your real AO3 downloads will look like the originals.</p>
+<div class="meta"><dl class="tags"><dt>Rating:</dt><dd>${esc(m.r || 'Not Rated')}</dd>${m.p ? `<dt>Relationship:</dt><dd>${esc(m.p.join(', '))}</dd>` : ''}${m.g ? `<dt>Additional Tags:</dt><dd>${esc(m.g.join(', '))}</dd>` : ''}<dt>Stats:</dt><dd>Words: ${fmtNum(m.w || 0)} Chapters: ${esc(m.c || '1/1')}</dd></dl>
+<h1>${esc(m.t)}</h1><div class="byline">by ${esc(m.a)}</div><p>Summary</p><blockquote class="userstuff"><p>${esc(m.s || '')}</p></blockquote></div></div>
+<div id="chapters">${body}</div></body></html>`;
+}
+class DemoStore {
+  constructor() { this.items = new Map(); this.blobs = new Map(); this.n = 0; this.seed(); }
+  id() { return 'd' + (++this.n); }
+  seed() {
+    const now = Date.now(), day = 864e5;
+    const folder = (name, parent) => { const id = this.id(); this.items.set(id, { id, name, mimeType: FOLDER, parents: [parent] }); return id; };
+    const dm = folder('Dramione', 'root');
+    const au = folder('Alternate Universe', dm), ph = folder('Post-Hogwarts', dm), pw = folder('Post-War', dm), wt = folder('Wartime', dm);
+    const HD = ['Hermione Granger/Draco Malfoy'], FAN = ['Harry Potter - J. K. Rowling'];
+    const fics = [
+      ['The Cartographer\u2019s Apprentice', 'inkwell_ophelia', 'Mature', 142300, '38/38', ph, HD, ['Enemies to Lovers', 'Forced Proximity', 'Ministry of Magic', 'Slow Burn', 'Happy Ending'], 'Assigned to map the shifting corridors beneath the Ministry, Hermione expects tedium. She does not expect her partner to be Draco Malfoy, or for the maps to start redrawing themselves around the two of them.', ['epub', 'html']],
+      ['Ink & Ash', 'moonlit_quill', 'Explicit', 98450, '24/24', wt, HD, ['Dark', 'Morally Grey Draco Malfoy', 'Spy Hermione Granger', 'Angst with a Happy Ending'], 'Two people on opposite sides of a war, one cursed manuscript, and a deadline neither of them can afford to miss.', ['epub']],
+      ['Salt and Stardust', 'tidewrites', 'Teen And Up Audiences', 46700, '11/11', ph, HD, ['Seaside Holiday', 'Enemies to Lovers', 'Banter'], 'A rained-out holiday on the Cornish coast, one rented cottage, and a booking mix-up that is absolutely not anyone\u2019s fault.', ['epub']],
+      ['Seven Winters', 'thornandteacup', 'Teen And Up Audiences', 61200, '7/7', pw, HD, ['Post-War', 'Healer Hermione Granger', 'St. Mungo\u2019s', 'Fluff and Angst'], 'Seven winters, seven letters, and one very stubborn owl.', ['epub', 'html']],
+      ['Where the Willows Bend', 'fernandfable', 'General Audiences', 18400, '1/1', pw, HD, ['One Shot', 'Cottagecore', 'Fluff'], 'She buys the cottage for the garden. The neighbour comes with it, unfortunately.', ['epub']],
+      ['Hollow Bells', 'fernandfable', 'Mature', 120500, '33/33', au, HD, ['Time Loop', 'Angst', 'Happy Ending'], 'Every morning the bells of the village chapel ring at six. Every morning she wakes up on the same Tuesday. Only one other person seems to remember.', ['epub']],
+      ['The Quiet Arithmetic', 'nocturne_ledger', 'Mature', 210880, '52/?', ph, HD, ['Slow Burn', 'Unspeakables', 'Mutual Pining'], 'Some equations take years to balance. Some take a war, a Department of Mysteries posting, and a great deal of very bad coffee.', ['html']],
+      ['Glasshouse', 'velvetpage', 'Explicit', 77300, '20/20', au, HD, ['Voldemort Wins', 'Dark', 'Morally Grey', 'Captivity'], 'In the world the Dark Lord built, the greenhouse at the edge of the grounds is the only place she is allowed to go. He is the only one who ever visits.', ['epub', 'html']],
+      ['Letters Never Sent', 'paper_lanterns', 'Teen And Up Audiences', 33900, '12/12', ph, HD, ['Eighth Year', 'Epistolary', 'Love Triangle', 'Pining'], 'A stack of unsent letters, found in the wrong book, by exactly the wrong person.', ['html']],
+      ['A Study in Silver', 'inkwell_ophelia', 'Mature', 54000, '15/15', wt, HD, ['Enemies to Friends to Lovers', 'Order of the Phoenix', 'Slow Burn'], 'Forced to share a safehouse for the winter, they draw up a treaty. It has fourteen clauses. They break all of them.', ['epub']],
+      ['Paper Cranes', 'moonlit_quill', 'General Audiences', 9800, '1/1', pw, HD, ['Oneshot', 'Fluff', 'Healer Hermione'], 'One thousand paper cranes, folded one bad day at a time.', ['html']],
+      ['The Lantern Room', 'nightjar_notes', 'Mature', 88100, '26/26', au, HD, ['Alternate Universe - Muggle', 'Lighthouse AU', 'Slow Burn', 'Hurt/Comfort'], 'The new lighthouse keeper was told to expect solitude. Nobody mentioned the man who rows out every evening with the post.', ['epub']],
+      ['Unspoken Clauses', 'velvetpage', 'Teen And Up Audiences', 29400, '9/9', pw, HD, ['Marriage Law', 'Fake Relationship', 'Humor'], 'It is a strictly professional arrangement. There is a contract. There are terms. There is, crucially, a no-hand-holding clause.', ['epub', 'html']],
+      ['The Long Night', 'nocturne_ledger', 'Explicit', 164000, '41/45', wt, HD, ['Voldemort Wins', 'Love Triangle', 'Morally Grey Hermione Granger', 'Dark Lord Voldemort'], 'The war is lost. What is left is a choice between two men, two kinds of survival, and the truth about what she has become.', ['epub']]
+    ];
+    fics.forEach((f, i) => {
+      const [t, a, r, w, c, parent, p, g, s, fmts] = f;
+      const meta = { t, a, r, w, c, k: !/\?/.test(c) && c.split('/')[0] === c.split('/')[1], f: FAN, p, g, s, wr: ['No Archive Warnings Apply'], u: '' };
+      delete meta.u;
+      for (const fm of fmts) {
+        const id = this.id(), ts = new Date(now - (i * 2.3 + (fm === 'html' ? .1 : 0)) * day).toISOString();
+        this.items.set(id, { id, name: `${t} - ${a}.${fm}`, mimeType: guessMime('x.' + fm), parents: [parent], createdTime: ts, modifiedTime: ts, description: packMeta(meta), sample: true });
+      }
+    });
+  }
+  async user() { return { displayName: 'Demo reader', emailAddress: 'demo' }; }
+  async getRoot() { return { id: 'root', name: CONFIG.siteTitle, capabilities: { canAddChildren: true, canEdit: true } }; }
+  async listChildren(id) { await new Promise(r => setTimeout(r, 40)); return [...this.items.values()].filter(i => i.parents[0] === id && !i.trashed).map(i => ({ ...i })); }
+  async getBytes(id) { if (this.blobs.has(id)) return this.blobs.get(id).arrayBuffer(); return new TextEncoder().encode(demoHtml(this.items.get(id))).buffer; }
+  isSample(id) { return !this.blobs.has(id); }
+  async createFolder(name, parent) { const id = this.id(); const it = { id, name, mimeType: FOLDER, parents: [parent] }; this.items.set(id, it); return { ...it }; }
+  async upload(file, parent, description) {
+    const id = this.id(), ts = new Date().toISOString();
+    const it = { id, name: file.name, mimeType: file.type || guessMime(file.name), parents: [parent], createdTime: ts, modifiedTime: ts, description, size: file.size };
+    this.items.set(id, it); this.blobs.set(id, file); return { ...it };
+  }
+  async rename(id, name) { this.items.get(id).name = name; return { ...this.items.get(id) }; }
+  async move(id, to) { this.items.get(id).parents = [to]; return { ...this.items.get(id) }; }
+  async trash(id) { const t = this.items.get(id); t.trashed = true; for (const it of this.items.values()) if (it.parents[0] === id) await this.trash(it.id); }
+  async setDescription(id, d) { this.items.get(id).description = d; return { ...this.items.get(id) }; }
+}
+
+/* =================================================================
+   LIBRARY LOADING + GROUPING
+   ================================================================= */
+async function loadTree() {
+  const root = await S.store.getRoot();
+  S.root = root;
+  S.canEdit = !!(root.capabilities && root.capabilities.canAddChildren);
+  S.folders = new Map([[root.id, { id: root.id, name: root.name || CONFIG.siteTitle, parent: null, children: [] }]]);
+  S.files = [];
+  let queue = [root.id];
+  while (queue.length) {
+    const batch = queue.splice(0, 6);
+    const results = await Promise.all(batch.map(id => S.store.listChildren(id)));
+    results.forEach((items, i) => {
+      const pid = batch[i];
+      for (const it of items) {
+        if (it.mimeType === FOLDER) {
+          S.folders.set(it.id, { id: it.id, name: it.name, parent: pid, children: [] });
+          S.folders.get(pid).children.push(it.id); queue.push(it.id);
+        } else if (isFic(it)) S.files.push({ ...it, parent: pid });
+      }
+    });
+  }
+  buildGroups();
+}
+function richness(m) { return m ? Object.keys(m).filter(k => k !== 'guess').length + (m.guess ? -5 : 0) : -99; }
+function metaFor(f) { return parseDesc(f.description) || S.metaCache[f.id + ':' + (f.modifiedTime || '')] || metaFromName(f.name); }
+function buildGroups() {
+  const map = new Map();
+  for (const f of S.files) {
+    const meta = metaFor(f);
+    const wid = meta.u && (meta.u.match(/works\/(\d+)/) || [])[1];
+    const key = f.parent + '|' + (wid ? 'w' + wid : norm(meta.t) + '|' + norm(meta.a));
+    let g = map.get(key);
+    const file = { ...f, fmt: fmtOf(f) };
+    if (!g) { g = { key, parent: f.parent, meta, files: [], added: f.createdTime || f.modifiedTime || '' }; map.set(key, g); }
+    else if (richness(meta) > richness(g.meta)) g.meta = meta;
+    g.files.push(file);
+    const t = f.createdTime || f.modifiedTime || ''; if (t > g.added) g.added = t;
+  }
+  const order = { epub: 0, html: 1, pdf: 2, azw3: 3, mobi: 4 };
+  S.groups = [...map.values()];
+  S.groupByKey = new Map(); S.groupByFile = new Map();
+  for (const g of S.groups) {
+    g.files.sort((a, b) => (order[a.fmt] ?? 9) - (order[b.fmt] ?? 9));
+    S.groupByKey.set(g.key, g); for (const f of g.files) S.groupByFile.set(f.id, g);
+  }
+  S.counts = new Map();
+  const direct = new Map(); for (const g of S.groups) direct.set(g.parent, (direct.get(g.parent) || 0) + 1);
+  const count = id => { const f = S.folders.get(id); let n = direct.get(id) || 0; for (const c of f.children) n += count(c); S.counts.set(id, n); return n; };
+  if (S.root) count(S.root.id);
+  S.colCounts = new Map(COLS.map(c => [c.slug, S.groups.filter(g => inCol(g, c)).length]));
+  const tc = new Map();
+  for (const g of S.groups) for (const t of new Set(g.meta.g || [])) { const k = norm(t); if (!k) continue; const e = tc.get(k) || { tag: t, n: 0 }; e.n++; tc.set(k, e); }
+  S.topTags = [...tc.values()].filter(e => e.n > 1 || S.groups.length < 20).sort((a, b) => b.n - a.n || a.tag.localeCompare(b.tag)).slice(0, 30);
+}
+function tagsOf(g) { if (!g.tagset) { const m = g.meta; g.tagset = [...(m.g || []), ...(m.cat || []), ...(m.wr || [])].map(t => ' ' + norm(t) + ' '); } return g.tagset; }
+function inCol(g, c) {
+  const m = g.meta;
+  if (c.rule === 'oneshot' && /^1\s*\/\s*1$/.test(m.c || '')) return true;
+  if (c.rule === 'long' && (m.w || 0) >= 100000) return true;
+  if (c.rule === 'short' && m.w && m.w < 10000) return true;
+  if (c.rule === 'complete' && m.k) return true;
+  if (c.rule === 'wip' && m.k === false) return true;
+  if (!c.kw.length) return false;
+  return tagsOf(g).some(t => c.kw.some(k => t.includes(' ' + k + ' ')) && !c.ex.some(x => t.includes(' ' + x + ' ')));
+}
+const allTagsOf = g => { const m = g.meta; return [...(m.g || []), ...(m.p || []), ...(m.x || []), ...(m.f || []), ...(m.wr || []), ...(m.cat || [])]; };
+const folderPath = id => { const out = []; let f = S.folders.get(id); while (f) { out.unshift(f); f = S.folders.get(f.parent); } return out; };
+const descendants = id => { const out = [id]; for (let i = 0; i < out.length; i++) { const f = S.folders.get(out[i]); if (f) out.push(...f.children); } return out; };
+const childFolders = id => (S.folders.get(id)?.children || []).map(c => S.folders.get(c)).sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+const folderName = id => id === S.root.id ? 'Library' : (S.folders.get(id)?.name || '');
+
+function haystack(g) {
+  if (!g.hay) { const m = g.meta; g.hay = norm([m.t, m.a, m.r, m.s, m.ser, ...(m.f || []), ...(m.p || []), ...(m.x || []), ...(m.g || []), ...(m.wr || []), ...folderPath(g.parent).slice(1).map(f => f.name), ...g.files.map(f => f.fmt)].join(' ')); }
+  return g.hay;
+}
+function visibleGroups() {
+  const q = norm(S.query);
+  let list;
+  if (q) { const toks = q.split(' '); list = S.groups.filter(g => { const h = haystack(g); return toks.every(t => h.includes(t)); }); }
+  else if (S.view.type === 'collection') { const c = COLS.find(x => x.slug === S.view.slug); list = c ? S.groups.filter(g => inCol(g, c)) : []; }
+  else if (S.view.type === 'tag') { const k = norm(S.view.tag); list = S.groups.filter(g => allTagsOf(g).some(t => norm(t) === k)); }
+  else { const ids = new Set(S.includeSub ? descendants(S.current) : [S.current]); list = S.groups.filter(g => ids.has(g.parent)); }
+  if (S.rating !== 'all') list = list.filter(g => (ratingKey(g.meta.r) || 'n') === S.rating);
+  if (S.fmt !== 'all') list = list.filter(g => g.files.some(f => f.fmt === S.fmt));
+  const by = {
+    added: (a, b) => (b.added || '').localeCompare(a.added || ''),
+    title: (a, b) => (a.meta.t || '').localeCompare(b.meta.t || '', undefined, { sensitivity: 'base' }),
+    author: (a, b) => (a.meta.a || '').localeCompare(b.meta.a || '', undefined, { sensitivity: 'base' }) || (a.meta.t || '').localeCompare(b.meta.t || ''),
+    long: (a, b) => (b.meta.w || 0) - (a.meta.w || 0),
+    short: (a, b) => (a.meta.w || 0) - (b.meta.w || 0)
+  }[S.sort];
+  return list.sort(by);
+}
+
+/* =================================================================
+   RENDERING
+   ================================================================= */
+function themeMenuHtml() {
+  return `<h4>Theme · just for you</h4>` + THEMES.map(t => `<button class="theme-opt ${S.prefs.theme === t.id ? 'on' : ''}" data-act="set-theme" data-theme-id="${t.id}">
+    <span class="sw">${t.sw.map(c => `<i style="background:${c}"></i>`).join('')}</span>${esc(t.name)}${icon('check', 'check')}</button>`).join('');
+}
+function renderShell() {
+  document.title = CONFIG.siteTitle;
+  $('#app').innerHTML = `
+  ${DEMO ? `<div class="demo-bar">Demo mode with sample fics. Uploads stay in this tab only. Add your Google details in <code>index.html</code> to connect your Drive.</div>` : ''}
+  <header class="topbar">
+    <button class="btn icon ghost menu-btn" data-act="menu" aria-label="Folders">${icon('menu')}</button>
+    <div class="brand" data-folder="${S.root.id}"><b>${esc(CONFIG.siteTitle)}</b><small>${esc(CONFIG.tagline)}</small></div>
+    <label class="search">${icon('search')}<input id="q" type="search" placeholder="Search titles, authors, tags, ships…" autocomplete="off" value="${esc(S.query)}"><button class="clear" data-act="clear-search" ${S.query ? '' : 'hidden'} aria-label="Clear search">${icon('x')}</button></label>
+    <div class="theme-wrap"><button class="btn icon ghost" data-act="theme" aria-label="Change theme" title="Change theme">${icon('palette')}</button><div class="popover" id="themeMenu" hidden></div></div>
+  </header>
+  <div class="layout">
+    <aside class="sidebar" id="sidebar"><div class="side-h">Shelves</div><nav class="tree" id="tree"></nav>${COLS.length ? '<div class="side-h">Collections</div><nav class="tree" id="cols"></nav>' : ''}<div class="side-foot" id="sideFoot"></div></aside>
+    <div class="scrim" data-act="menu"></div>
+    <main id="main"></main>
+  </div>
+  <div class="reader" id="reader" hidden></div>`;
+  $('#q').addEventListener('input', e => {
+    S.query = e.target.value; $('.search .clear').hidden = !S.query;
+    renderMainDebounced();
+  });
+}
+const renderMainDebounced = (() => { let t; return () => { clearTimeout(t); t = setTimeout(() => { renderMain(); renderTree(); }, 120); }; })();
+
+function renderTree() {
+  for (const f of folderPath(S.current)) S.open.add(f.id);
+  const node = (id, depth) => {
+    const f = S.folders.get(id), kids = childFolders(id), open = S.open.has(id) || depth === 0;
+    return `<li><div class="node ${id === S.current && !S.query && S.view.type === 'folder' ? 'on' : ''}" style="--d:${depth}" data-folder="${id}">
+      ${kids.length && depth > 0 ? `<button class="caret ${open ? 'open' : ''}" data-caret="${id}" aria-label="Expand">${icon('right')}</button>` : '<span class="caret-sp"></span>'}
+      <span class="nm">${depth === 0 ? 'All fics' : esc(f.name)}</span><span class="ct">${S.counts.get(id) || 0}</span></div>
+      ${kids.length && open ? `<ul>${kids.map(k => node(k.id, depth + 1)).join('')}</ul>` : ''}</li>`;
+  };
+  $('#tree').innerHTML = `<ul>${node(S.root.id, 0)}</ul>`;
+  if ($('#cols')) $('#cols').innerHTML = `<ul>${COLS.map(c => { const n = S.colCounts.get(c.slug) || 0; return `<li><div class="node ${S.view.type === 'collection' && S.view.slug === c.slug && !S.query ? 'on' : ''} ${n ? '' : 'dim'}" style="--d:0" data-col="${c.slug}"><span class="caret-sp"></span><span class="nm">${esc(c.name)}</span><span class="ct">${n}</span></div></li>`; }).join('')}</ul>`;
+  const u = S.user || {};
+  $('#sideFoot').innerHTML = `
+    ${S.canEdit && !S.editing ? `<button class="btn" data-act="enable-edit">${icon('lock')} Owner tools</button>` : ''}
+    ${S.editing ? `<div class="who"><span class="owner-pill">Owner tools on</span></div>` : ''}
+    <div class="who">${u.photoLink ? `<img src="${esc(u.photoLink)}" alt="" referrerpolicy="no-referrer">` : `<span class="av">${esc((u.displayName || '?')[0])}</span>`}<span>${esc(u.displayName || 'Reader')}</span></div>
+    ${DEMO ? '' : `<button class="btn ghost" data-act="signout">Sign out</button>`}`;
+}
+
+function cardHtml(g) {
+  const m = g.meta, rk = ratingKey(m.r), h = hash((m.t || '') + (m.a || ''));
+  const tags = [...(m.p || []), ...(m.g || [])].slice(0, 4);
+  const w = m.w || 0, sw = w < 5000 ? 36 : w < 20000 ? 44 : w < 60000 ? 52 : w < 120000 ? 62 : 72;
+  return `<article class="card" tabindex="0" data-g="${esc(g.key)}" style="--spine:${SPINES[h % SPINES.length]};--spine-h:${188 + (h >> 4) % 52}px;--spine-w:${sw}px" title="${esc(m.t)}${m.a ? ' by ' + esc(m.a) : ''}">
+    <div class="spine"><span class="sp-title">${esc(m.t)}</span><span class="sp-author">${esc(m.a || '')}</span>${rk ? `<span class="sp-r r-${rk}"></span>` : ''}</div>
+    <div class="card-body">
+      <div class="card-top">${rk ? `<span class="rating r-${rk}" title="${esc(m.r)}">${RLABEL[rk]}</span>` : ''}${g.files.map(f => `<span class="fmt">${esc(f.fmt.toUpperCase())}</span>`).join('')}${m.k ? '<span class="done">Complete</span>' : (m.c && /\?|\d+\/\d+/.test(m.c) && m.k === false ? '<span class="wip">In progress</span>' : '')}</div>
+      <h3>${esc(m.t)}</h3>${m.a ? `<div class="by">by ${esc(m.a)}</div>` : ''}
+      ${tags.length ? `<div class="tags">${tags.map(t => `<span class="chip">${esc(t)}</span>`).join('')}</div>` : ''}
+      ${m.s ? `<p class="sum">${esc(m.s)}</p>` : ''}
+      <div class="stats">${w ? `<span>${fmtNum(w)} words</span>` : ''}${m.c ? `<span>· ${esc(m.c)} ch</span>` : ''}${S.query || S.view.type !== 'folder' || (S.includeSub && g.parent !== S.current) ? `<span>· ${esc(folderName(g.parent))}</span>` : ''}</div>
+    </div></article>`;
+}
+
+function renderMain() {
+  const main = $('#main'); if (!main) return;
+  const q = S.query.trim(), path = folderPath(S.current), here = S.folders.get(S.current);
+  const list = visibleGroups(), subs = childFolders(S.current), atRoot = S.current === S.root.id;
+  const v = S.view, isFolder = !q && v.type === 'folder';
+  const col = v.type === 'collection' ? COLS.find(c => c.slug === v.slug) : null;
+  let h = '';
+  if (isFolder && path.length > 1) h += `<nav class="crumbs">${path.map((f, i) => i < path.length - 1 ? `<a data-folder="${f.id}">${i === 0 ? 'Library' : esc(f.name)}</a><span>›</span>` : '').join('')}</nav>`;
+  if (!q && !isFolder) h += `<nav class="crumbs"><a data-folder="${S.root.id}">Library</a><span>›</span><span>${v.type === 'collection' ? 'Collections' : 'Tag'}</span></nav>`;
+  const title = q ? 'Search' : col ? col.name : v.type === 'tag' ? v.tag : atRoot ? 'The Shelves' : here.name;
+  const n = isFolder ? (S.counts.get(S.current) || 0) : list.length;
+  h += `<div class="head"><div><h1>${esc(title)}</h1></div>
+    <div class="count">${q ? `${list.length} match${list.length === 1 ? '' : 'es'} for “${esc(q)}”` : `${fmtNum(n)} fic${n === 1 ? '' : 's'}`}</div>
+    ${S.editing && isFolder ? `<div class="actions"><button class="btn" data-act="new-folder">${icon('plus')} New folder</button><button class="btn primary" data-act="upload">${icon('upload')} Upload fics</button></div>` : ''}</div>`;
+  if (!q && col) {
+    const how = [col.kw.length ? `tagged ${(col.tags || []).slice(0, 3).map(t => '“' + esc(t) + '”').join(', ')}${col.tags.length > 3 ? ' (or similar)' : ''} on AO3` : '',
+      { oneshot: 'with just one chapter', long: 'over 100,000 words', short: 'under 10,000 words', complete: 'marked complete', wip: 'still in progress' }[col.rule] || ''].filter(Boolean).join(', or ');
+    h += `<p class="col-note">${icon('spark')} Gathered automatically from every shelf: fics ${how}.${S.editing ? ' Missing one? Open it, choose <b>Edit details</b>, and add the tag.' : ''}</p>`;
+  }
+  const unscanned = S.editing ? S.groups.filter(g => g.meta.guess && g.files.some(f => READABLE.includes(f.fmt))).length : 0;
+  if (unscanned) h += `<div class="banner">${icon('spark')}<span>${unscanned} fic${unscanned === 1 ? ' is' : 's are'} missing details (title, author, tags). Scan them once and everyone sees the full info.</span><button class="btn primary" data-act="scan-all">Scan now</button></div>`;
+
+  if (isFolder && atRoot) {
+    const prog = progress.all();
+    const recent = Object.entries(prog).filter(([id]) => S.groupByFile.has(id)).sort((a, b) => b[1].at - a[1].at).slice(0, 4);
+    if (recent.length) h += `<div class="section-h">Continue reading</div><div class="resume">${recent.map(([id, p]) => {
+      const g = S.groupByFile.get(id), m = g.meta, hh = hash((m.t || '') + (m.a || ''));
+      return `<button class="rcard" data-resume="${esc(id)}" style="--spine:${SPINES[hh % SPINES.length]}"><span class="mini"></span><div><b>${esc(m.t)}</b><small>${esc(p.label || 'Pick up where you left off')}</small></div></button>`;
+    }).join('')}</div>`;
+  }
+  if (isFolder && (subs.length || S.editing)) {
+    h += `<div class="section-h">${atRoot ? 'Shelves' : 'Folders'}</div><div class="folders">${subs.map(f => `
+      <div class="ftile" data-folder="${f.id}" tabindex="0"><span class="fi">${icon('folder')}</span><div class="ft-txt"><b>${esc(f.name)}</b><small>${fmtNum(S.counts.get(f.id) || 0)} fics${f.children.length ? ` · ${f.children.length} folder${f.children.length === 1 ? '' : 's'}` : ''}</small></div>
+      ${S.editing ? `<button class="btn icon ghost kebab" data-act="folder-menu" data-id="${f.id}" aria-label="Folder options">${icon('dots')}</button>` : ''}</div>`).join('')}
+      ${S.editing ? `<button class="ftile add" data-act="new-folder">${icon('plus')} New folder</button>` : ''}</div>`;
+  }
+  if (isFolder && atRoot) {
+    const cols = COLS.filter(c => S.colCounts.get(c.slug));
+    if (cols.length) h += `<div class="section-h">Browse by trope</div><div class="folders">${cols.map(c => `
+      <div class="ftile" data-col="${c.slug}" tabindex="0"><span class="fi">${icon('spark')}</span><div class="ft-txt"><b>${esc(c.name)}</b><small>${fmtNum(S.colCounts.get(c.slug))} fic${S.colCounts.get(c.slug) === 1 ? '' : 's'}</small></div></div>`).join('')}</div>`;
+    if (S.topTags.length) h += `<div class="section-h">Popular tags</div><div class="cloud">${S.topTags.map(t => `<button class="chip big" data-tag="${esc(t.tag)}">${esc(t.tag)} <span>${t.n}</span></button>`).join('')}</div>`;
+  }
+  h += `<div class="toolbar"><div class="section-h">${q ? 'Results' : isFolder ? 'Fics' : 'Fics'}</div>
+    ${isFolder && subs.length ? `<label class="toggle"><input type="checkbox" id="incSub" ${S.includeSub ? 'checked' : ''}> Include subfolders</label>` : ''}
+    <select class="sel" id="fRating" aria-label="Rating"><option value="all">All ratings</option>${Object.entries(RNAME).map(([k, v]) => `<option value="${k}" ${S.rating === k ? 'selected' : ''}>${v}</option>`).join('')}</select>
+    <select class="sel" id="fFmt" aria-label="Format"><option value="all">All formats</option><option value="epub" ${S.fmt === 'epub' ? 'selected' : ''}>EPUB</option><option value="html" ${S.fmt === 'html' ? 'selected' : ''}>HTML</option><option value="pdf" ${S.fmt === 'pdf' ? 'selected' : ''}>PDF</option></select>
+    <select class="sel" id="fSort" aria-label="Sort">${[['added', 'Recently added'], ['title', 'Title A–Z'], ['author', 'Author'], ['long', 'Longest first'], ['short', 'Shortest first']].map(([k, v]) => `<option value="${k}" ${S.sort === k ? 'selected' : ''}>${v}</option>`).join('')}</select></div>`;
+  h += list.length ? `<div class="grid">${list.map(cardHtml).join('')}</div>`
+    : `<div class="empty"><b>${q ? 'Nothing found' : 'This shelf is empty'}</b>${q ? 'Try a different word, ship or tag.' : S.editing ? 'Upload fics or drag files anywhere on this page.' : 'Nothing here yet.'}</div>`;
+  main.innerHTML = h;
+  const bind = (id, k, f = v => v) => { const el = $('#' + id); if (el) el.onchange = e => { S[k] = f(e.target.type === 'checkbox' ? e.target.checked : e.target.value); renderMain(); }; };
+  bind('incSub', 'includeSub'); bind('fRating', 'rating'); bind('fFmt', 'fmt'); bind('fSort', 'sort');
+}
+function render() { renderTree(); renderMain(); }
+
+function setView(view, hsh, push) {
+  S.view = view; S.query = ''; const qi = $('#q'); if (qi) { qi.value = ''; $('.search .clear').hidden = true; }
+  document.body.classList.remove('nav-open');
+  if (push && location.hash.slice(1) !== hsh) { try { history.pushState(null, '', '#' + hsh); } catch {} }
+  render(); window.scrollTo({ top: 0 });
+}
+function openCollection(slug, push = true) { if (COLS.some(c => c.slug === slug)) setView({ type: 'collection', slug }, 'c-' + slug, push); }
+function openTag(tag, push = true) { setView({ type: 'tag', tag }, 't-' + encodeURIComponent(tag), push); }
+function routeFromHash() {
+  let hsh = location.hash.slice(1); try { hsh = decodeURIComponent(hsh); } catch {}
+  if (hsh.startsWith('c-') && COLS.some(c => c.slug === hsh.slice(2))) return openCollection(hsh.slice(2), false);
+  if (hsh.startsWith('t-') && hsh.length > 2) return openTag(hsh.slice(2), false);
+  const m = hsh.match(/^f-(.+)$/); go(m && S.folders.has(m[1]) ? m[1] : S.root.id, false);
+}
+function go(folderId, push = true) {
+  S.view = { type: 'folder' };
+  if (!S.folders.has(folderId)) folderId = S.root.id;
+  S.current = folderId; S.query = ''; const qi = $('#q'); if (qi) { qi.value = ''; $('.search .clear').hidden = true; }
+  document.body.classList.remove('nav-open');
+  if (push) { const hsh = folderId === S.root.id ? '' : 'f-' + folderId; if (location.hash.slice(1) !== hsh) { try { history.pushState(null, '', hsh ? '#' + hsh : location.pathname + location.search); } catch {} } }
+  render(); window.scrollTo({ top: 0 });
+}
+
+/* =================================================================
+   DETAIL SHEET
+   ================================================================= */
+function overlay(html, cls = '') {
+  closeOverlay();
+  const el = document.createElement('div'); el.className = 'overlay'; el.id = 'overlay';
+  el.innerHTML = `<div class="sheet ${cls}" role="dialog" aria-modal="true">${html}</div>`;
+  el.addEventListener('mousedown', e => { if (e.target === el) { el.dataset.closing = 1; } });
+  el.addEventListener('click', e => { if (e.target === el && el.dataset.closing) closeOverlay(); });
+  document.body.appendChild(el); return el;
+}
+function closeOverlay() { const o = $('#overlay'); if (o) { o.remove(); if (o._resolve) o._resolve(null); } }
+function chipRow(list, label) { return list && list.length ? `<dt>${label}</dt><dd>${list.map(t => `<button class="chip" data-tag="${esc(t)}">${esc(t)}</button>`).join('')}</dd>` : ''; }
+function openDetail(g) {
+  const m = g.meta, rk = ratingKey(m.r);
+  const readable = g.files.filter(f => READABLE.includes(f.fmt));
+  const fpath = folderPath(g.parent).slice(1).map(f => f.name).join(' › ') || 'Library';
+  overlay(`
+    <div class="sheet-h"><div><div class="card-top" style="margin-bottom:8px">${rk ? `<span class="rating r-${rk}">${RLABEL[rk]}</span> <span class="by" style="margin:0">${esc(m.r)}</span>` : ''}</div>
+      <h2>${esc(m.t)}</h2>${m.a ? `<div class="by">by ${esc(m.a)}</div>` : ''}</div>
+      <button class="btn icon ghost x" data-act="close-modal" aria-label="Close">${icon('x')}</button></div>
+    <div class="sheet-b">
+      ${m.guess ? '<div class="loading-line" id="scanLine">Reading the fic for details…</div>' : ''}
+      ${m.s ? `<p class="summary">${esc(m.s)}</p>` : ''}
+      <dl class="meta-grid">
+        ${chipRow(m.f, 'Fandom')}${chipRow(m.p, 'Relationships')}${chipRow(m.x, 'Characters')}${chipRow(m.wr, 'Warnings')}${chipRow(m.g, 'Tags')}
+        ${m.ser ? `<dt>Series</dt><dd>${esc(m.ser)}</dd>` : ''}
+        <dt>Stats</dt><dd>${[m.w ? fmtNum(m.w) + ' words' : '', m.c ? 'Chapters ' + esc(m.c) : '', m.k ? 'Complete' : '', m.d ? 'Published ' + esc(m.d) : ''].filter(Boolean).join(' · ') || '—'}</dd>
+        <dt>Shelf</dt><dd><button class="chip" data-folder="${g.parent}">${esc(fpath)}</button></dd>
+      </dl>
+      <div class="btn-row">
+        ${readable.map((f, i) => `<button class="btn ${i === 0 ? 'primary' : ''}" data-act="read" data-file="${f.id}">${icon('book')} Read ${readable.length > 1 ? f.fmt.toUpperCase() : ''}</button>`).join('')}
+        ${g.files.map(f => `<button class="btn" data-act="download" data-file="${f.id}">${icon('download')} ${esc(f.fmt.toUpperCase())}</button>`).join('')}
+        ${m.u ? `<a class="btn" href="${esc(m.u)}" target="_blank" rel="noopener">${icon('ext')} Kudos on AO3</a>` : ''}
+      </div>
+      ${S.editing ? `<div class="owner-row"><div class="lbl">Owner tools</div><div class="btn-row">
+        <button class="btn" data-act="edit" data-file="${g.files[0].id}">${icon('edit')} Edit details</button>
+        <button class="btn" data-act="move" data-file="${g.files[0].id}">${icon('move')} Move</button>
+        <button class="btn danger" data-act="delete" data-file="${g.files[0].id}">${icon('trash')} Delete</button></div></div>` : ''}
+    </div>`);
+  if (m.guess && readable.length) {
+    const fid = g.files[0].id;
+    scanGroup(g, S.editing).then(changed => {
+      const ng = S.groupByFile.get(fid);
+      if ($('#overlay') && $('#scanLine')) { if (changed && ng) openDetail(ng); else $('#scanLine').remove(); }
+      if (changed) render();
+    }).catch(e => { const l = $('#scanLine'); if (l) l.textContent = 'Couldn’t read details: ' + e.message; });
+  }
+}
+async function scanGroup(g, save) {
+  const f = g.files.find(x => READABLE.includes(x.fmt)); if (!f) return false;
+  const buf = await S.store.getBytes(f.id);
+  const m = await parseBytes(buf, f.name);
+  for (const file of g.files) {
+    const live = S.files.find(x => x.id === file.id); if (!live) continue;
+    if (save) { const upd = await S.store.setDescription(file.id, packMeta(m)); live.description = upd.description; live.modifiedTime = upd.modifiedTime; }
+    else S.metaCache[live.id + ':' + (live.modifiedTime || '')] = { ...m, s: m.s && m.s.slice(0, 700) };
+  }
+  if (!save) ls.set('fanlib:meta', S.metaCache);
+  buildGroups(); return true;
+}
+
+/* =================================================================
+   DIALOG HELPERS
+   ================================================================= */
+function dialog({ title, text = '', fields = [], ok = 'Save', danger = false, cancel = 'Cancel' }) {
+  return new Promise(resolve => {
+    const el = overlay(`<div class="sheet-h"><h2 style="font-size:1.4rem">${esc(title)}</h2></div>
+      <form class="sheet-b" id="dlgForm">${text ? `<p class="dlg-text">${text}</p>` : ''}
+      ${fields.map(f => `<label class="field"><span>${esc(f.label)}</span>${f.type === 'select'
+        ? `<select name="${f.name}">${f.options.map(o => `<option value="${esc(o.value)}" ${o.value === f.value ? 'selected' : ''} ${o.disabled ? 'disabled' : ''}>${esc(o.label)}</option>`).join('')}</select>`
+        : f.type === 'textarea' ? `<textarea name="${f.name}" rows="4">${esc(f.value || '')}</textarea>`
+        : `<input name="${f.name}" value="${esc(f.value || '')}" ${f.required ? 'required' : ''} autocomplete="off">`}</label>`).join('')}
+      <div class="dlg-actions"><button type="button" class="btn ghost" data-act="close-modal">${esc(cancel)}</button><button type="submit" class="btn ${danger ? 'danger' : 'primary'}">${esc(ok)}</button></div></form>`, 'small');
+    el._resolve = resolve;
+    const form = $('#dlgForm', el);
+    form.addEventListener('submit', e => { e.preventDefault(); const data = Object.fromEntries(new FormData(form)); el._resolve = null; el.remove(); resolve(data); });
+    const first = $('input,select,textarea', form); if (first) setTimeout(() => { first.focus(); first.select && first.select(); }, 30);
+  });
+}
+function folderOptions(excludeId) {
+  const banned = excludeId ? new Set(descendants(excludeId)) : new Set();
+  const out = [];
+  const walk = (id, d) => { const f = S.folders.get(id); out.push({ value: id, label: '  '.repeat(d) + (d ? '› ' : '') + (d ? f.name : 'Library (top level)'), disabled: banned.has(id) }); for (const c of childFolders(id)) walk(c.id, d + 1); };
+  walk(S.root.id, 0); return out;
+}
+function toast(msg, { sticky = false, action, onAction } = {}) {
+  const el = document.createElement('div'); el.className = 'toast';
+  const span = document.createElement('span'); span.textContent = msg; el.appendChild(span);
+  if (action) { const b = document.createElement('button'); b.textContent = action; b.onclick = () => { el.remove(); onAction && onAction(); }; el.appendChild(b); }
+  $('#toasts').appendChild(el);
+  const close = () => el.remove();
+  if (!sticky) setTimeout(close, 4200);
+  return { update: t => { span.textContent = t; }, close, done: (t) => { span.textContent = t; setTimeout(close, 3000); } };
+}
+async function guarded(fn) {
+  try { return await fn(); }
+  catch (e) {
+    console.error(e);
+    if (e.auth) { toast('Your session ended.', { sticky: true, action: 'Sign in again', onAction: () => reauth() }); }
+    else toast('Something went wrong: ' + e.message);
+  }
+}
+async function reauth() { try { await auth.request(S.editing); toast('Signed in again.'); } catch (e) { toast(e.message); } }
+
+/* =================================================================
+   OWNER ACTIONS
+   ================================================================= */
+async function enableEditing() {
+  if (DEMO) { S.editing = true; render(); toast('Owner tools are on. Try uploading, making folders, moving and deleting.'); return; }
+  try { await auth.request(true); S.editing = auth.hasWrite(); render(); if (S.editing) toast('Owner tools are on.'); }
+  catch (e) { toast(e.message); }
+}
+async function newFolder(parent = S.current) {
+  const r = await dialog({ title: 'New folder', text: `Inside <b>${esc(folderName(parent))}</b>`, fields: [{ name: 'name', label: 'Folder name', required: true }], ok: 'Create' });
+  if (!r || !r.name.trim()) return;
+  await guarded(async () => {
+    const it = await S.store.createFolder(r.name.trim(), parent);
+    S.folders.set(it.id, { id: it.id, name: it.name, parent, children: [] }); S.folders.get(parent).children.push(it.id);
+    S.open.add(parent); buildGroups(); render(); toast(`Created “${it.name}”.`);
+  });
+}
+async function uploadFiles(fileList, parent = S.current) {
+  const files = [...fileList].filter(f => isFic({ name: f.name, mimeType: f.type }));
+  const skipped = fileList.length - files.length;
+  if (!files.length) { toast('Only .epub, .html, .pdf, .mobi and .azw3 files can be added.'); return; }
+  const t = toast(`Uploading 0 of ${files.length}…`, { sticky: true });
+  let ok = 0, failed = 0;
+  for (const file of files) {
+    try {
+      const meta = await parseBytes(await file.arrayBuffer(), file.name);
+      const it = await S.store.upload(file, parent, packMeta(meta));
+      S.files.push({ ...it, parent }); ok++;
+    } catch (e) {
+      failed++; console.error(e);
+      if (e.auth) { t.close(); toast('Your session ended.', { sticky: true, action: 'Sign in again', onAction: reauth }); break; }
+    }
+    t.update(`Uploading ${ok + failed} of ${files.length}…`);
+  }
+  buildGroups(); render();
+  t.done(`Added ${ok} fic${ok === 1 ? '' : 's'} to ${folderName(parent)}${failed ? ` · ${failed} failed` : ''}${skipped ? ` · ${skipped} skipped (unsupported type)` : ''}.`);
+}
+async function editDetails(g) {
+  const m = g.meta;
+  const r = await dialog({
+    title: 'Edit details', fields: [
+      { name: 't', label: 'Title', value: m.t, required: true }, { name: 'a', label: 'Author', value: m.a },
+      { name: 'r', label: 'Rating', type: 'select', value: m.r || 'Not Rated', options: ['General Audiences', 'Teen And Up Audiences', 'Mature', 'Explicit', 'Not Rated'].map(v => ({ value: v, label: v })) },
+      { name: 'p', label: 'Relationships (comma separated)', value: (m.p || []).join(', ') },
+      { name: 'g', label: 'Tags (comma separated)', value: (m.g || []).join(', ') },
+      { name: 's', label: 'Summary', type: 'textarea', value: m.s }
+    ]
+  });
+  if (!r) return;
+  const split = s => s.split(',').map(x => x.trim()).filter(Boolean);
+  const nm = { ...m, t: r.t.trim(), a: r.a.trim(), r: r.r, p: split(r.p), g: split(r.g), s: r.s.trim() }; delete nm.guess;
+  await guarded(async () => {
+    for (const f of g.files) { const upd = await S.store.setDescription(f.id, packMeta(nm)); const live = S.files.find(x => x.id === f.id); live.description = upd.description; live.modifiedTime = upd.modifiedTime; }
+    buildGroups(); render(); const ng = S.groupByFile.get(g.files[0].id); if (ng) openDetail(ng); toast('Details saved.');
+  });
+}
+async function moveGroup(g) {
+  const r = await dialog({ title: 'Move to…', text: `<b>${esc(g.meta.t)}</b>${g.files.length > 1 ? ` (${g.files.length} files)` : ''}`, fields: [{ name: 'to', label: 'Folder', type: 'select', value: g.parent, options: folderOptions() }], ok: 'Move' });
+  if (!r || r.to === g.parent) return;
+  await guarded(async () => {
+    for (const f of g.files) { await S.store.move(f.id, r.to, f.parent); S.files.find(x => x.id === f.id).parent = r.to; }
+    buildGroups(); render(); toast(`Moved to ${folderName(r.to)}.`);
+  });
+}
+async function deleteGroup(g) {
+  const r = await dialog({ title: 'Delete this fic?', text: `<b>${esc(g.meta.t)}</b> (${g.files.map(f => f.fmt.toUpperCase()).join(' + ')}) will move to your Google Drive trash. You can restore it from there for 30 days.`, ok: 'Move to trash', danger: true });
+  if (!r) return;
+  await guarded(async () => {
+    for (const f of g.files) await S.store.trash(f.id);
+    const ids = new Set(g.files.map(f => f.id)); S.files = S.files.filter(f => !ids.has(f.id));
+    buildGroups(); render(); toast('Moved to Drive trash.');
+  });
+}
+async function folderMenu(id) {
+  const f = S.folders.get(id);
+  const el = overlay(`<div class="sheet-h"><h2 style="font-size:1.4rem">${esc(f.name)}</h2><button class="btn icon ghost x" data-act="close-modal">${icon('x')}</button></div>
+    <div class="sheet-b"><div class="btn-row" style="flex-direction:column;align-items:stretch">
+      <button class="btn" data-fm="rename">${icon('edit')} Rename</button><button class="btn" data-fm="move">${icon('move')} Move</button>
+      <button class="btn" data-fm="sub">${icon('plus')} New folder inside</button><button class="btn danger" data-fm="delete">${icon('trash')} Delete folder</button></div></div>`, 'small');
+  el.addEventListener('click', async e => {
+    const b = e.target.closest('[data-fm]'); if (!b) return;
+    const act = b.dataset.fm; closeOverlay();
+    if (act === 'sub') return newFolder(id);
+    if (act === 'rename') {
+      const r = await dialog({ title: 'Rename folder', fields: [{ name: 'name', label: 'Folder name', value: f.name, required: true }] });
+      if (r && r.name.trim()) await guarded(async () => { await S.store.rename(id, r.name.trim()); f.name = r.name.trim(); S.groups.forEach(g => delete g.hay); render(); });
+    }
+    if (act === 'move') {
+      const r = await dialog({ title: 'Move folder', text: `<b>${esc(f.name)}</b> and everything in it`, fields: [{ name: 'to', label: 'Into', type: 'select', value: f.parent, options: folderOptions(id) }], ok: 'Move' });
+      if (r && r.to !== f.parent) await guarded(async () => {
+        await S.store.move(id, r.to, f.parent);
+        const old = S.folders.get(f.parent); old.children = old.children.filter(c => c !== id);
+        f.parent = r.to; S.folders.get(r.to).children.push(id); buildGroups(); render();
+      });
+    }
+    if (act === 'delete') {
+      const n = S.counts.get(id) || 0;
+      const r = await dialog({ title: 'Delete folder?', text: `<b>${esc(f.name)}</b>${n ? ` and the ${n} fic${n === 1 ? '' : 's'} inside it` : ''} will move to your Google Drive trash. You can restore them from there for 30 days.`, ok: 'Move to trash', danger: true });
+      if (r) await guarded(async () => {
+        await S.store.trash(id);
+        const gone = new Set(descendants(id));
+        S.files = S.files.filter(x => !gone.has(x.parent));
+        const par = S.folders.get(f.parent); par.children = par.children.filter(c => c !== id);
+        gone.forEach(x => S.folders.delete(x));
+        if (gone.has(S.current)) S.current = f.parent;
+        buildGroups(); render(); toast('Folder moved to Drive trash.');
+      });
+    }
+  });
+}
+async function scanAll() {
+  const todo = S.groups.filter(g => g.meta.guess && g.files.some(f => READABLE.includes(f.fmt)));
+  const t = toast(`Scanning 0 of ${todo.length}…`, { sticky: true });
+  let done = 0, failed = 0, i = 0;
+  const worker = async () => { while (i < todo.length) { const g = todo[i++]; try { await scanGroup(g, true); } catch (e) { failed++; if (e.auth) { i = todo.length; } } done++; t.update(`Scanning ${done} of ${todo.length}…`); } };
+  await Promise.all([worker(), worker(), worker()]);
+  buildGroups(); render(); t.done(`Scanned ${done - failed} fic${done - failed === 1 ? '' : 's'}${failed ? ` · ${failed} couldn’t be read` : ''}.`);
+}
+async function download(fileId) {
+  const g = S.groupByFile.get(fileId), f = g.files.find(x => x.id === fileId);
+  await guarded(async () => {
+    const t = toast('Preparing download…', { sticky: true });
+    const buf = await S.store.getBytes(fileId);
+    const url = URL.createObjectURL(new Blob([buf], { type: f.mimeType || guessMime(f.name) }));
+    const a = document.createElement('a'); a.href = url; a.download = f.name; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 30000); t.close();
+  });
+}
+
+/* =================================================================
+   READER (EPUB + HTML)
+   ================================================================= */
+function readerVars() {
+  const cs = getComputedStyle(document.documentElement);
+  const font = S.prefs.readerFont === 'sans' ? "'Inter',system-ui,sans-serif" : S.prefs.readerFont === 'serif' ? "'Lora',Georgia,serif" : cs.getPropertyValue('--reader-font').trim();
+  return { bg: cs.getPropertyValue('--reader-bg').trim(), ink: cs.getPropertyValue('--reader-ink').trim(), accent: cs.getPropertyValue('--accent').trim(), font, size: S.prefs.fontSize };
+}
+function readerCss() {
+  const v = readerVars();
+  return `html{background:${v.bg}}body{background:${v.bg}!important;color:${v.ink}!important;font-family:${v.font}!important;font-size:${v.size}px!important;line-height:1.75;max-width:40em;margin:0 auto!important;padding:2.4em 1.4em 6em!important;-webkit-text-size-adjust:100%;overflow-wrap:break-word}
+  a{color:${v.accent}}h1,h2,h3{line-height:1.25;font-weight:600}p{margin:0 0 1em}img{max-width:100%;height:auto}
+  blockquote{margin:1em 0;padding-left:1em;border-left:3px solid ${v.accent}}dl.tags{display:grid;grid-template-columns:max-content 1fr;gap:.25em 1em;font-size:.82em;opacity:.85}dl.tags dd{margin:0}dl.tags dt{opacity:.75}
+  #preface .message{font-size:.8em;opacity:.7}hr{border:0;border-top:1px solid currentColor;opacity:.18;margin:2.6em 0}::selection{background:${v.accent};color:${v.bg}}`;
+}
+function readerBar(g, f) {
+  return `<div class="r-bar">
+    <button class="btn icon" data-act="reader-close" aria-label="Back to library">${icon('back')}</button>
+    <div class="r-title"><b>${esc(g.meta.t)}</b><small>${esc(g.meta.a || '')}${g.files.length > 1 ? ' · ' + f.fmt.toUpperCase() : ''}</small></div>
+    <select class="sel r-chap" id="rChap" aria-label="Chapter" hidden></select>
+    <button class="btn icon" data-act="font-dec" aria-label="Smaller text" title="Smaller text"><span style="font-size:.8em;font-weight:700">A</span></button>
+    <button class="btn icon" data-act="font-inc" aria-label="Larger text" title="Larger text"><span style="font-size:1.15em;font-weight:700">A</span></button>
+    <button class="btn icon" data-act="font-cycle" aria-label="Change reading font" title="Reading font: ${{ theme: 'Theme font', serif: 'Serif', sans: 'Sans' }[S.prefs.readerFont]}"><span style="font-size:.95em;font-weight:600">Aa</span></button>
+  </div><div class="r-body" id="rBody"><div class="r-loading">Opening…</div></div>`;
+}
+async function openReader(fileId) {
+  const g = S.groupByFile.get(fileId); if (!g) return;
+  const f = g.files.find(x => x.id === fileId);
+  closeOverlay();
+  const r = $('#reader'); r.hidden = false; r.innerHTML = readerBar(g, f); document.body.style.overflow = 'hidden';
+  S.reading = { fileId, g, f };
+  try { history.pushState({ reader: 1 }, ''); } catch {}
+  try {
+    const buf = await S.store.getBytes(fileId);
+    if (!S.reading || S.reading.fileId !== fileId) return;
+    if (f.fmt === 'epub' && !S.store.isSample(fileId)) await openEpub(buf, fileId);
+    else openHtml(new TextDecoder().decode(buf), fileId);
+    progress.set(fileId, {});
+  } catch (e) {
+    console.error(e);
+    $('#rBody').innerHTML = `<div class="r-msg"><p>Couldn’t open this fic.</p><p style="opacity:.7">${esc(e.message)}</p><button class="btn" data-act="download" data-file="${fileId}">${icon('download')} Download instead</button></div>`;
+    if (e.auth) toast('Your session ended.', { sticky: true, action: 'Sign in again', onAction: reauth });
+  }
+}
+function openHtml(text, fileId) {
+  const doc = new DOMParser().parseFromString(text, 'text/html');
+  doc.querySelectorAll('script,iframe,object,embed,form,meta[http-equiv],link[rel="stylesheet"]').forEach(n => n.remove());
+  doc.querySelectorAll('*').forEach(el => [...el.attributes].forEach(a => { if (/^on/i.test(a.name) || /^\s*javascript:/i.test(a.value)) el.removeAttribute(a.name); }));
+  const base = doc.createElement('base'); base.target = '_blank'; doc.head.prepend(base);
+  const fl = doc.createElement('link'); fl.rel = 'stylesheet'; fl.href = FONTS_URL; doc.head.append(fl);
+  const st = doc.createElement('style'); st.id = 'fanlib-reader'; st.textContent = readerCss(); doc.head.append(st);
+  const ifr = document.createElement('iframe');
+  ifr.setAttribute('sandbox', 'allow-same-origin allow-popups allow-popups-to-escape-sandbox');
+  ifr.title = 'Fic text';
+  ifr.srcdoc = '<!DOCTYPE html>' + doc.documentElement.outerHTML;
+  $('#rBody').replaceChildren(ifr);
+  ifr.addEventListener('load', () => {
+    const w = ifr.contentWindow, d = ifr.contentDocument; if (!d) return;
+    const max = () => Math.max(1, d.documentElement.scrollHeight - w.innerHeight);
+    const p = progress.get(fileId);
+    if (p && p.ratio) setTimeout(() => w.scrollTo(0, p.ratio * max()), 60);
+    const heads = $$('#chapters h2, .chapter h2, h2.toc-heading', d); const list = heads.length ? heads : $$('h2', d);
+    const sel = $('#rChap');
+    if (sel && list.length > 1) {
+      sel.innerHTML = list.map((h, i) => `<option value="${i}">${esc(textOf(h).slice(0, 60) || 'Section ' + (i + 1))}</option>`).join(''); sel.hidden = false;
+      sel.onchange = () => list[+sel.value].scrollIntoView({ behavior: 'smooth' });
+    }
+    w.addEventListener('scroll', throttle(() => {
+      const ratio = w.scrollY / max();
+      let cur = 0; list.forEach((h, i) => { if (h.getBoundingClientRect().top < w.innerHeight * .4) cur = i; });
+      if (sel && !sel.hidden) sel.value = cur;
+      progress.set(fileId, { ratio, label: (list.length > 1 ? textOf(list[cur]).slice(0, 40) + ' · ' : '') + Math.round(ratio * 100) + '% read' });
+    }, 700), { passive: true });
+    d.addEventListener('keydown', e => { if (e.key === 'Escape') closeReaderNav(); });
+  });
+  S.htmlFrame = ifr;
+}
+async function openEpub(buf, fileId) {
+  const body = $('#rBody');
+  body.innerHTML = `<div id="epubView"></div><div class="r-nav"><button class="btn" data-act="reader-prev">${icon('left')} Prev</button><button class="btn" data-act="reader-next">Next ${icon('right')}</button></div>`;
+  const book = ePub(buf); S.book = book;
+  const paginated = innerWidth >= 900;
+  const rend = book.renderTo('epubView', { width: '100%', height: '100%', flow: paginated ? 'paginated' : 'scrolled-doc', spread: 'none', allowScriptedContent: false });
+  S.rend = rend;
+  rend.hooks.content.register(c => { try { c.addStylesheet(FONTS_URL); } catch {} });
+  applyEpubTheme();
+  const p = progress.get(fileId);
+  try { await rend.display(p && p.cfi || undefined); } catch { await rend.display(); }
+  book.loaded.navigation.then(nav => {
+    const flat = []; const walk = (items, d) => items.forEach(it => { flat.push({ label: ' '.repeat(d * 2) + (it.label || '').trim(), href: it.href }); if (it.subitems) walk(it.subitems, d + 1); });
+    walk(nav.toc || [], 0); S.toc = flat;
+    const sel = $('#rChap');
+    if (sel && flat.length > 1) { sel.innerHTML = flat.map((t, i) => `<option value="${i}">${esc(t.label.slice(0, 60))}</option>`).join(''); sel.hidden = false; sel.onchange = () => rend.display(flat[+sel.value].href); }
+  });
+  rend.on('relocated', loc => {
+    const href = loc.start.href || ''; const base = href.split('#')[0];
+    const i = S.toc.findIndex(t => t.href && t.href.split('#')[0].endsWith(base)) ;
+    const sel = $('#rChap'); if (sel && i >= 0) sel.value = i;
+    progress.set(fileId, { cfi: loc.start.cfi, label: i >= 0 ? S.toc[i].label.trim().slice(0, 50) : 'In progress' });
+  });
+  rend.on('keyup', e => { if (e.key === 'ArrowLeft') rend.prev(); if (e.key === 'ArrowRight') rend.next(); if (e.key === 'Escape') closeReaderNav(); });
+}
+let themeN = 0;
+function applyEpubTheme() {
+  if (!S.rend) return;
+  const v = readerVars(), n = 't' + (++themeN);
+  S.rend.themes.register(n, {
+    'html': { 'background': v.bg + ' !important' },
+    'body': { 'background': v.bg + ' !important', 'color': v.ink + ' !important', 'font-family': v.font + ' !important', 'line-height': '1.75 !important', 'padding': '0 12px !important' },
+    'p, div, span, li, blockquote, dd, dt, td': { 'font-family': 'inherit !important', 'color': 'inherit !important' },
+    'a': { 'color': v.accent + ' !important' },
+    'img': { 'max-width': '100% !important', 'height': 'auto !important' }
+  });
+  S.rend.themes.select(n);
+  S.rend.themes.fontSize(v.size + 'px');
+}
+function refreshReaderStyle() {
+  if (!S.reading) return;
+  if (S.rend) applyEpubTheme();
+  const d = S.htmlFrame && S.htmlFrame.contentDocument; const st = d && d.getElementById('fanlib-reader'); if (st) st.textContent = readerCss();
+  const fb = $('[data-act="font-cycle"]'); if (fb) fb.title = 'Reading font: ' + { theme: 'Theme font', serif: 'Serif', sans: 'Sans' }[S.prefs.readerFont];
+  if (S.prefs.readerFont !== S._lastFont) { S._lastFont = S.prefs.readerFont; toast('Reading font: ' + { theme: 'Theme font', serif: 'Serif', sans: 'Sans' }[S.prefs.readerFont]); }
+}
+function closeReader() {
+  if (S.book) { try { S.book.destroy(); } catch {} }
+  S.book = S.rend = S.htmlFrame = null; S.reading = null; S.toc = [];
+  const r = $('#reader'); if (r) { r.hidden = true; r.innerHTML = ''; }
+  document.body.style.overflow = '';
+  renderMain();
+}
+function closeReaderNav() { if (history.state && history.state.reader) history.back(); else closeReader(); }
+
+/* =================================================================
+   EVENTS
+   ================================================================= */
+document.addEventListener('click', async e => {
+  const caret = e.target.closest('[data-caret]');
+  if (caret) { e.stopPropagation(); const id = caret.dataset.caret; S.open.has(id) ? S.open.delete(id) : S.open.add(id); renderTree(); return; }
+  const actEl = e.target.closest('[data-act]');
+  if (actEl) {
+    const act = actEl.dataset.act, fid = actEl.dataset.file, g = fid && S.groupByFile.get(fid);
+    switch (act) {
+      case 'menu': document.body.classList.toggle('nav-open'); break;
+      case 'theme': { const m = $('#themeMenu'); m.innerHTML = themeMenuHtml(); m.hidden = !m.hidden; e.stopPropagation(); break; }
+      case 'set-theme': { applyTheme(actEl.dataset.themeId); prefs.save(); const tm = $('#themeMenu'); if (tm) tm.innerHTML = themeMenuHtml(); $$('.gate-themes button').forEach(b => b.classList.toggle('on', b.dataset.themeId === S.prefs.theme)); refreshReaderStyle(); break; }
+      case 'clear-search': S.query = ''; $('#q').value = ''; actEl.hidden = true; render(); $('#q').focus(); break;
+      case 'signin': signIn(actEl); break;
+      case 'signout': try { google.accounts.oauth2.revoke(auth.token, () => {}); } catch {} auth.clear(); location.hash = ''; location.reload(); break;
+      case 'enable-edit': enableEditing(); break;
+      case 'new-folder': newFolder(); break;
+      case 'upload': $('#fileInput').click(); break;
+      case 'scan-all': scanAll(); break;
+      case 'close-modal': closeOverlay(); break;
+      case 'read': openReader(fid); break;
+      case 'download': download(fid); break;
+      case 'edit': if (g) { closeOverlay(); editDetails(g); } break;
+      case 'move': if (g) { closeOverlay(); moveGroup(g); } break;
+      case 'delete': if (g) { closeOverlay(); deleteGroup(g); } break;
+      case 'folder-menu': e.stopPropagation(); folderMenu(actEl.dataset.id); break;
+      case 'reader-close': closeReaderNav(); break;
+      case 'reader-prev': S.rend && S.rend.prev(); break;
+      case 'reader-next': S.rend && S.rend.next(); break;
+      case 'font-dec': S.prefs.fontSize = Math.max(13, S.prefs.fontSize - 1); prefs.save(); refreshReaderStyle(); break;
+      case 'font-inc': S.prefs.fontSize = Math.min(30, S.prefs.fontSize + 1); prefs.save(); refreshReaderStyle(); break;
+      case 'font-cycle': S.prefs.readerFont = { theme: 'serif', serif: 'sans', sans: 'theme' }[S.prefs.readerFont] || 'theme'; prefs.save(); refreshReaderStyle(); break;
+    }
+    return;
+  }
+  if (!e.target.closest('.theme-wrap')) { const m = $('#themeMenu'); if (m) m.hidden = true; }
+  const tag = e.target.closest('[data-tag]');
+  if (tag) { closeOverlay(); openTag(tag.dataset.tag); return; }
+  const colEl = e.target.closest('[data-col]'); if (colEl) { closeOverlay(); openCollection(colEl.dataset.col); return; }
+  const res = e.target.closest('[data-resume]'); if (res) { openReader(res.dataset.resume); return; }
+  const fol = e.target.closest('[data-folder]'); if (fol) { closeOverlay(); go(fol.dataset.folder); return; }
+  const card = e.target.closest('[data-g]'); if (card) { const g = S.groupByKey.get(card.dataset.g); if (g) openDetail(g); }
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') { if ($('#overlay')) closeOverlay(); else if (S.reading) closeReaderNav(); else document.body.classList.remove('nav-open'); }
+  if ((e.key === 'Enter' || e.key === ' ') && e.target.matches && e.target.matches('.card,.ftile[data-folder],.ftile[data-col]') && !$('#overlay')) { e.preventDefault(); e.target.click(); }
+  if (S.rend && !$('#overlay')) { if (e.key === 'ArrowLeft') S.rend.prev(); if (e.key === 'ArrowRight') S.rend.next(); }
+  if (e.key === '/' && !S.reading && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA' && $('#q')) { e.preventDefault(); $('#q').focus(); }
+});
+window.addEventListener('popstate', () => {
+  if (S.reading) { closeReader(); return; }
+  if (!S.root) return;
+  routeFromHash();
+});
+$('#fileInput').addEventListener('change', e => { if (e.target.files.length) uploadFiles(e.target.files); e.target.value = ''; });
+let dragDepth = 0;
+document.addEventListener('dragenter', e => { if (!S.editing || S.reading || !e.dataTransfer.types.includes('Files')) return; e.preventDefault(); if (++dragDepth === 1) { const z = document.createElement('div'); z.className = 'dropzone'; z.id = 'dropzone'; z.textContent = `Drop to add to ${folderName(S.current)}`; document.body.appendChild(z); } });
+document.addEventListener('dragleave', () => { if (dragDepth && --dragDepth === 0) $('#dropzone')?.remove(); });
+document.addEventListener('dragover', e => { if (S.editing && e.dataTransfer.types.includes('Files')) e.preventDefault(); });
+document.addEventListener('drop', e => { if (!S.editing) return; e.preventDefault(); dragDepth = 0; $('#dropzone')?.remove(); if (e.dataTransfer.files.length) uploadFiles(e.dataTransfer.files); });
+
+/* =================================================================
+   SIGN-IN SCREENS + BOOT
+   ================================================================= */
+function gate(msg = '', err = '') {
+  $('#app').innerHTML = `<div class="gate"><div class="gate-card">
+    <div class="crest">${icon('book')}</div><h1>${esc(CONFIG.siteTitle)}</h1>
+    <p>${msg || `${esc(CONFIG.tagline)}.<br>Sign in with the Google account ${esc(CONFIG.ownerName)} shared the library with.`}</p>
+    <button class="btn primary" data-act="signin" style="font-size:1rem;padding:.7em 1.4em">Sign in with Google</button>
+    ${err ? `<div class="err">${err}</div>` : ''}
+    <div class="gate-themes">${THEMES.map(t => `<button data-act="set-theme" data-theme-id="${t.id}" class="${S.prefs.theme === t.id ? 'on' : ''}" title="${esc(t.name)}">${t.sw.map(c => `<i style="background:${c}"></i>`).join('')}</button>`).join('')}</div>
+  </div></div>`;
+}
+async function signIn(btn) {
+  if (btn) { btn.disabled = true; btn.textContent = 'Opening Google…'; }
+  try { await auth.request(false); await startLibrary(); }
+  catch (e) { gate('', esc(e.message)); }
+}
+function skeleton() {
+  $('#app').innerHTML = `<div style="padding:40px clamp(16px,5vw,60px)"><div style="font-family:var(--font-display);font-size:2rem;margin-bottom:24px">${esc(CONFIG.siteTitle)}</div>
+    <div class="grid">${'<div class="skel"></div>'.repeat(6)}</div></div>`;
+}
+async function startLibrary() {
+  skeleton();
+  try {
+    S.user = await S.store.user().catch(() => null);
+    prefs.load();
+    await loadTree();
+  } catch (e) {
+    console.error(e);
+    if (e.auth) return gate('Your session ended. Sign in again to keep reading.');
+    if (e.status === 404 || e.status === 403) return gate(`This library isn’t shared with ${esc(S.user && S.user.emailAddress || 'this account')} yet. Ask ${esc(CONFIG.ownerName)} to add you, then sign in again.`);
+    return gate('', 'Couldn’t load the library: ' + esc(e.message));
+  }
+  S.editing = !DEMO && S.canEdit && auth.hasWrite();
+  renderShell();
+  S.current = S.root.id;
+  for (const f of childFolders(S.root.id)) S.open.add(f.id);
+  routeFromHash();
+}
+function boot() {
+  S.prefs = { theme: ls.get('fanlib:lastTheme', CONFIG.defaultTheme), fontSize: 19, readerFont: 'theme' };
+  if (DEMO) { S.store = new DemoStore(); startLibrary(); return; }
+  S.store = new DriveStore();
+  const s = document.createElement('script'); s.src = 'https://accounts.google.com/gsi/client'; s.async = true; document.head.appendChild(s);
+  auth.restore();
+  if (auth.valid()) startLibrary(); else gate();
+}
+boot();
+</script>
+</body>
+</html>
