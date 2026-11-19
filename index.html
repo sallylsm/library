@@ -330,8 +330,6 @@ html[data-theme="bookshelf"] .ftile{background:linear-gradient(180deg,#4a3220,#3
 <div class="toasts" id="toasts"></div>
 <input type="file" id="fileInput" multiple accept=".epub,.html,.htm,.pdf,.mobi,.azw3" hidden>
 
-<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/epubjs@0.3.93/dist/epub.min.js"></script>
 <script>
 'use strict';
 /* =================================================================
@@ -354,6 +352,24 @@ const RLABEL = { g: 'G', t: 'T', m: 'M', e: 'E', n: '?' };
 const RNAME = { g: 'General', t: 'Teen', m: 'Mature', e: 'Explicit', n: 'Not Rated' };
 const READABLE = ['epub', 'html'];
 const COLS = (CONFIG.collections || []).map(c => ({ ...c, slug: String(c.name).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''), kw: (c.tags || []).map(t => String(t).toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()), ex: (c.exclude || []).map(t => String(t).toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()) }));
+
+/* ---------- reader libraries load only when first needed ---------- */
+const loadScript = src => new Promise((res, rej) => { const s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = () => rej(new Error('Couldn’t load ' + src.split('/').pop())); document.head.appendChild(s); });
+let libsP = null;
+const ensureLibs = () => libsP || (libsP = (async () => {
+  if (!window.JSZip) await loadScript('https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js');
+  if (!window.ePub) await loadScript('https://cdn.jsdelivr.net/npm/epubjs@0.3.93/dist/epub.min.js');
+})().catch(e => { libsP = null; throw e; }));
+
+/* ---------- on-device cache of the library list (IndexedDB) ---------- */
+const idb = {
+  p: null,
+  open() { return this.p || (this.p = new Promise((res, rej) => { const r = indexedDB.open('fanlib', 1); r.onupgradeneeded = () => r.result.createObjectStore('kv'); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); })); },
+  async run(mode, fn) { try { const db = await this.open(); return await new Promise((res, rej) => { const tx = db.transaction('kv', mode); const st = tx.objectStore('kv'); const rq = fn(st); tx.oncomplete = () => res(rq && rq.result); tx.onerror = () => rej(tx.error); }); } catch { return null; } },
+  get(k) { return this.run('readonly', st => st.get(k)); },
+  set(k, v) { return this.run('readwrite', st => st.put(v, k)); },
+  del(k) { return this.run('readwrite', st => st.delete(k)); }
+};
 
 /* ---------- tiny helpers ---------- */
 const $ = (s, el = document) => el.querySelector(s);
@@ -499,6 +515,7 @@ function parseAo3Doc(doc, raw) {
   return m;
 }
 async function parseEpub(buf) {
+  await ensureLibs();
   const zip = await JSZip.loadAsync(buf); const m = {};
   try {
     const cont = await zip.file('META-INF/container.xml')?.async('string');
@@ -547,11 +564,11 @@ function ratingKey(r) {
 class AuthError extends Error { constructor() { super('Your sign-in expired.'); this.auth = true; } }
 const auth = {
   token: null, exp: 0, scope: '',
-  restore() { try { const j = JSON.parse(sessionStorage.getItem('fanlib:tok')); if (j && j.exp > Date.now() + 60000) Object.assign(this, j); } catch {} },
+  restore() { try { const j = JSON.parse(localStorage.getItem('fanlib:tok')); if (j && j.exp > Date.now() + 60000) Object.assign(this, j); } catch {} },
   valid() { return !!this.token && this.exp > Date.now() + 30000; },
   hasWrite() { return this.scope.split(' ').includes(WRITE_SCOPE); },
-  save() { try { sessionStorage.setItem('fanlib:tok', JSON.stringify({ token: this.token, exp: this.exp, scope: this.scope })); } catch {} },
-  clear() { this.token = null; this.exp = 0; this.scope = ''; try { sessionStorage.removeItem('fanlib:tok'); } catch {} },
+  save() { try { localStorage.setItem('fanlib:tok', JSON.stringify({ token: this.token, exp: this.exp, scope: this.scope })); } catch {} },
+  clear() { this.token = null; this.exp = 0; this.scope = ''; try { localStorage.removeItem('fanlib:tok'); sessionStorage.removeItem('fanlib:tok'); } catch {} },
   request(write) {
     return new Promise((resolve, reject) => {
       if (!(window.google && google.accounts && google.accounts.oauth2)) return reject(new Error('Google sign-in is still loading. Try again in a moment.'));
@@ -591,6 +608,26 @@ class DriveStore {
       const j = await (await this.req(`/files?q=${q}&fields=nextPageToken,files(${FIELDS})&pageSize=1000&supportsAllDrives=true&includeItemsFromAllDrives=true${page ? '&pageToken=' + encodeURIComponent(page) : ''}`)).json();
       out.push(...j.files); page = j.nextPageToken;
     } while (page);
+    return out;
+  }
+  async listWhere(cond) {
+    const out = []; let page = '';
+    do {
+      const q = encodeURIComponent(`(${cond}) and trashed=false`);
+      const j = await (await this.req(`/files?q=${q}&fields=nextPageToken,files(${FIELDS})&pageSize=1000&supportsAllDrives=true&includeItemsFromAllDrives=true${page ? '&pageToken=' + encodeURIComponent(page) : ''}`)).json();
+      out.push(...j.files); page = j.nextPageToken;
+    } while (page);
+    return out;
+  }
+  async listMany(ids) {
+    const chunks = []; for (let i = 0; i < ids.length; i += 25) chunks.push(ids.slice(i, i + 25));
+    const out = []; let k = 0;
+    const one = async c => {
+      try { return await this.listWhere(c.map(id => `'${id}' in parents`).join(' or ')); }
+      catch (e) { if (e.status === 400 && c.length > 1) { const h = Math.ceil(c.length / 2); return [...await one(c.slice(0, h)), ...await one(c.slice(h))]; } throw e; }
+    };
+    const worker = async () => { while (k < chunks.length) out.push(...await one(chunks[k++])); };
+    await Promise.all(Array.from({ length: Math.min(6, chunks.length) }, worker));
     return out;
   }
   async getBytes(id) { return (await this.req(`/files/${id}?alt=media&supportsAllDrives=true`)).arrayBuffer(); }
@@ -689,6 +726,7 @@ class DemoStore {
   }
   async user() { return { displayName: 'Demo reader', emailAddress: 'demo' }; }
   async getRoot() { return { id: 'root', name: CONFIG.siteTitle, capabilities: { canAddChildren: true, canEdit: true } }; }
+  async listMany(ids) { const set = new Set(ids); await new Promise(r => setTimeout(r, 40)); return [...this.items.values()].filter(i => set.has(i.parents[0]) && !i.trashed).map(i => ({ ...i })); }
   async listChildren(id) { await new Promise(r => setTimeout(r, 40)); return [...this.items.values()].filter(i => i.parents[0] === id && !i.trashed).map(i => ({ ...i })); }
   async getBytes(id) { if (this.blobs.has(id)) return this.blobs.get(id).arrayBuffer(); return new TextEncoder().encode(demoHtml(this.items.get(id))).buffer; }
   isSample(id) { return !this.blobs.has(id); }
@@ -707,28 +745,39 @@ class DemoStore {
 /* =================================================================
    LIBRARY LOADING + GROUPING
    ================================================================= */
-async function loadTree() {
+async function fetchTree(onProgress) {
   const root = await S.store.getRoot();
-  S.root = root;
-  S.canEdit = !!(root.capabilities && root.capabilities.canAddChildren);
-  S.folders = new Map([[root.id, { id: root.id, name: root.name || CONFIG.siteTitle, parent: null, children: [] }]]);
-  S.files = []; S.junk = [];
-  let queue = [root.id];
-  while (queue.length) {
-    const batch = queue.splice(0, 6);
-    const results = await Promise.all(batch.map(id => S.store.listChildren(id)));
-    results.forEach((items, i) => {
-      const pid = batch[i];
-      for (const it of items) {
-        if (isJunk(it.name)) { if (it.mimeType !== FOLDER) S.junk.push({ ...it, parent: pid }); continue; }
-        if (it.mimeType === FOLDER) {
-          S.folders.set(it.id, { id: it.id, name: it.name, parent: pid, children: [] });
-          S.folders.get(pid).children.push(it.id); queue.push(it.id);
-        } else if (isFic(it)) S.files.push({ ...it, parent: pid });
-      }
-    });
+  const folders = new Map([[root.id, { id: root.id, name: root.name || CONFIG.siteTitle, parent: null, children: [] }]]);
+  const files = [], junk = [], seen = new Set();
+  let level = [root.id];
+  while (level.length) {
+    const items = await S.store.listMany(level);
+    const next = [];
+    for (const it of items) {
+      if (seen.has(it.id)) continue; seen.add(it.id);
+      const pid = (it.parents || []).find(p => folders.has(p)); if (!pid) continue;
+      if (isJunk(it.name)) { if (it.mimeType !== FOLDER) junk.push({ ...it, parent: pid }); continue; }
+      if (it.mimeType === FOLDER) { folders.set(it.id, { id: it.id, name: it.name, parent: pid, children: [] }); folders.get(pid).children.push(it.id); next.push(it.id); }
+      else if (isFic(it)) files.push({ ...it, parent: pid });
+    }
+    level = next;
+    if (onProgress) onProgress(files.length, folders.size);
   }
+  return { root, folders, files, junk };
+}
+async function loadTree(onProgress) {
+  const t = await fetchTree(onProgress);
+  S.root = t.root; S.canEdit = !!(t.root.capabilities && t.root.capabilities.canAddChildren);
+  S.folders = t.folders; S.files = t.files; S.junk = t.junk;
   collapseFicFolders();
+  buildGroups();
+}
+const cacheKey = () => 'lib:' + userKey() + ':' + CONFIG.rootFolderId;
+const saveCache = (() => { let t; return () => { if (DEMO || !S.root) return; clearTimeout(t); t = setTimeout(() => idb.set(cacheKey(), { v: 1, at: Date.now(), root: S.root, canEdit: S.canEdit, folders: [...S.folders.values()], files: S.files, junk: S.junk, ficFolders: [...S.ficFolders.values()] }), 600); }; })();
+function applySnapshot(c) {
+  S.root = c.root; S.canEdit = c.canEdit;
+  S.folders = new Map(c.folders.map(f => [f.id, f])); S.files = c.files; S.junk = c.junk || [];
+  S.ficFolders = new Map((c.ficFolders || []).map(f => [f.id, f]));
   buildGroups();
 }
 /* A folder named after the one fic inside it (e.g. "Manacled" holding Manacled.epub + Manacled.html)
@@ -775,6 +824,7 @@ function buildGroups() {
   const direct = new Map(); for (const g of S.groups) direct.set(g.parent, (direct.get(g.parent) || 0) + 1);
   const count = id => { const f = S.folders.get(id); let n = direct.get(id) || 0; for (const c of f.children) n += count(c); S.counts.set(id, n); return n; };
   if (S.root) count(S.root.id);
+  saveCache();
   S.colCounts = new Map(COLS.map(c => [c.slug, S.groups.filter(g => inCol(g, c)).length]));
   const tc = new Map();
   for (const g of S.groups) for (const t of new Set(g.meta.g || [])) { const k = norm(t); if (!k) continue; const e = tc.get(k) || { tag: t, n: 0 }; e.n++; tc.set(k, e); }
@@ -1301,6 +1351,7 @@ function openHtml(text, fileId) {
   S.htmlFrame = ifr;
 }
 async function openEpub(buf, fileId) {
+  await ensureLibs();
   const body = $('#rBody');
   body.innerHTML = `<div id="epubView"></div><div class="r-nav"><button class="btn" data-act="reader-prev">${icon('left')} Prev</button><button class="btn" data-act="reader-next">Next ${icon('right')}</button></div>`;
   const book = ePub(buf); S.book = book;
@@ -1370,7 +1421,7 @@ document.addEventListener('click', async e => {
       case 'set-theme': { applyTheme(actEl.dataset.themeId); prefs.save(); const tm = $('#themeMenu'); if (tm) tm.innerHTML = themeMenuHtml(); $$('.gate-themes button').forEach(b => b.classList.toggle('on', b.dataset.themeId === S.prefs.theme)); refreshReaderStyle(); break; }
       case 'clear-search': S.query = ''; $('#q').value = ''; actEl.hidden = true; render(); $('#q').focus(); break;
       case 'signin': signIn(actEl); break;
-      case 'signout': try { google.accounts.oauth2.revoke(auth.token, () => {}); } catch {} auth.clear(); location.hash = ''; location.reload(); break;
+      case 'signout': try { google.accounts.oauth2.revoke(auth.token, () => {}); } catch {} auth.clear(); idb.del(cacheKey()).then(() => { try { localStorage.removeItem('fanlib:lastUser'); } catch {} location.hash = ''; location.reload(); }); break;
       case 'enable-edit': enableEditing(); break;
       case 'new-folder': newFolder(); break;
       case 'upload': $('#fileInput').click(); break;
@@ -1436,26 +1487,57 @@ async function signIn(btn) {
   catch (e) { gate('', esc(e.message)); }
 }
 function skeleton() {
-  $('#app').innerHTML = `<div style="padding:40px clamp(16px,5vw,60px)"><div style="font-family:var(--font-display);font-size:2rem;margin-bottom:24px">${esc(CONFIG.siteTitle)}</div>
+  $('#app').innerHTML = `<div style="padding:40px clamp(16px,5vw,60px)"><div style="font-family:var(--font-display);font-size:2rem;margin-bottom:6px">${esc(CONFIG.siteTitle)}</div><div id="skelMsg" style="color:var(--muted);margin-bottom:22px">Gathering the shelves…</div>
     <div class="grid">${'<div class="skel"></div>'.repeat(6)}</div></div>`;
 }
-async function startLibrary() {
-  skeleton();
-  try {
-    S.user = await S.store.user().catch(() => null);
-    prefs.load();
-    await loadTree();
-  } catch (e) {
-    console.error(e);
-    if (e.auth) return gate('Your session ended. Sign in again to keep reading.');
-    if (e.status === 404 || e.status === 403) return gate(`This library isn’t shared with ${esc(S.user && S.user.emailAddress || 'this account')} yet. Ask ${esc(CONFIG.ownerName)} to add you, then sign in again.`);
-    return gate('', 'Couldn’t load the library: ' + esc(e.message));
-  }
+function showLibrary() {
   S.editing = !DEMO && S.canEdit && auth.hasWrite();
   renderShell();
   S.current = S.root.id;
   for (const f of childFolders(S.root.id)) S.open.add(f.id);
   routeFromHash();
+}
+function loadFailed(e) {
+  console.error(e);
+  if (e.auth) return gate('Your session ended. Sign in again to keep reading.');
+  if (e.status === 404 || e.status === 403) return gate(`This library isn’t shared with ${esc(S.user && S.user.emailAddress || 'this account')} yet. Ask ${esc(CONFIG.ownerName)} to add you, then sign in again.`);
+  return gate('', 'Couldn’t load the library: ' + esc(e.message));
+}
+async function refreshInBackground() {
+  try {
+    const u = await S.store.user();
+    if (u && S.user && u.emailAddress !== S.user.emailAddress) { S.user = u; ls.set('fanlib:lastUser', u); return startLibrary(true); }
+    if (u) { S.user = u; ls.set('fanlib:lastUser', u); }
+    const t = await fetchTree();
+    S.root = t.root; S.canEdit = !!(t.root.capabilities && t.root.capabilities.canAddChildren);
+    S.folders = t.folders; S.files = t.files; S.junk = t.junk;
+    collapseFicFolders(); buildGroups();
+    if (!S.folders.has(S.current)) S.current = S.root.id;
+    S.editing = S.canEdit && auth.hasWrite();
+    if (!$('#overlay')) render(); else renderTree();
+  } catch (e) {
+    console.warn('Background refresh failed', e);
+    if (e.auth) toast('Your session ended.', { sticky: true, action: 'Sign in again', onAction: reauth });
+    else if (e.status === 404 || e.status === 403) loadFailed(e);
+  }
+}
+async function startLibrary(skipCache) {
+  if (!DEMO && !skipCache) {
+    const cu = ls.get('fanlib:lastUser', null);
+    if (cu) {
+      S.user = cu; prefs.load();
+      const c = await idb.get(cacheKey());
+      if (c && c.v === 1 && c.root) { applySnapshot(c); showLibrary(); refreshInBackground(); return; }
+    }
+  }
+  skeleton();
+  try {
+    S.user = await S.store.user().catch(() => null);
+    if (S.user && !DEMO) ls.set('fanlib:lastUser', S.user);
+    prefs.load();
+    await loadTree((n, f) => { const m = $('#skelMsg'); if (m) m.textContent = `Gathering the shelves… ${n} fic file${n === 1 ? '' : 's'} in ${f} folder${f === 1 ? '' : 's'} so far`; });
+  } catch (e) { return loadFailed(e); }
+  showLibrary();
 }
 function boot() {
   S.prefs = { theme: ls.get('fanlib:lastTheme', CONFIG.defaultTheme), fontSize: 19, readerFont: 'theme' };
