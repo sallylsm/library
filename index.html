@@ -470,7 +470,7 @@ const icon = (n, cls = '') => `<svg class="i ${cls}" viewBox="0 0 24 24" aria-hi
 /* ---------- app state ---------- */
 const S = {
   store: null, user: null, root: null,
-  folders: new Map(), files: [], junk: [], ficFolders: new Map(), groups: [], groupByKey: new Map(), groupByFile: new Map(), counts: new Map(),
+  folders: new Map(), files: [], junk: [], zips: [], ficFolders: new Map(), groups: [], groupByKey: new Map(), groupByFile: new Map(), counts: new Map(),
   current: null, view: { type: 'folder' }, colCounts: new Map(), topTags: [], autoTags: [], query: '', sort: 'added', rating: 'all', ship: 'all', shipOpts: [], fmt: 'all', includeSub: true,
   canEdit: false, editing: false, open: new Set(),
   metaCache: ls.get('fanlib:meta', {}), prefs: {}, reading: null, book: null, rend: null, toc: []
@@ -793,6 +793,7 @@ class DemoStore {
       const pm = { t: 'Paper Moon', a: 'lanternlight', r: 'Mature', w: 51200, c: '14/14', k: true, f: FAN, p: HD, g: ['Wartime', 'Spy Hermione Granger', 'Slow Burn'], s: 'A forged identity, a safehouse in the Scottish Highlands, and an alliance neither of them would admit to.' };
       for (const fm of ['epub', 'html']) { const id = this.id(), ts = new Date(now - 30 * day).toISOString(); this.items.set(id, { id, name: 'Paper Moon.' + fm, mimeType: guessMime('x.' + fm), parents: [ffid], createdTime: ts, modifiedTime: ts, description: packMeta(pm), sample: true });
         const jid = this.id(); this.items.set(jid, { id: jid, name: '._Paper Moon.' + fm, mimeType: guessMime('x.' + fm), parents: [ffid], createdTime: ts, modifiedTime: ts, size: 4096 }); } }
+    { const zid = this.id(); this.items.set(zid, { id: zid, name: 'Dramione backup.zip', mimeType: 'application/zip', parents: [dm], size: 3145728 }); }
     { const jid = this.id(); this.items.set(jid, { id: jid, name: '._The Long Night - nocturne_ledger.epub', mimeType: 'application/epub+zip', parents: [wt], createdTime: new Date().toISOString(), modifiedTime: new Date().toISOString(), size: 4096 }); }
     fics.forEach((f, i) => {
       const [t, a, r, w, c, parent, p, g, s, fmts] = f;
@@ -828,7 +829,7 @@ class DemoStore {
 async function fetchTree(onProgress) {
   const root = await S.store.getRoot();
   const folders = new Map([[root.id, { id: root.id, name: root.name || CONFIG.siteTitle, parent: null, children: [] }]]);
-  const files = [], junk = [], seen = new Set();
+  const files = [], junk = [], zips = [], seen = new Set();
   let level = [root.id];
   while (level.length) {
     const items = await S.store.listMany(level);
@@ -837,26 +838,27 @@ async function fetchTree(onProgress) {
       if (seen.has(it.id)) continue; seen.add(it.id);
       const pid = (it.parents || []).find(p => folders.has(p)); if (!pid) continue;
       if (isJunk(it.name)) { if (it.mimeType !== FOLDER) junk.push({ ...it, parent: pid }); continue; }
+      if (it.mimeType !== FOLDER && /\.zip$/i.test(it.name)) { zips.push({ ...it, parent: pid }); continue; }
       if (it.mimeType === FOLDER) { folders.set(it.id, { id: it.id, name: decodeEntities(it.name), parent: pid, children: [] }); folders.get(pid).children.push(it.id); next.push(it.id); }
       else if (isFic(it)) files.push({ ...it, parent: pid });
     }
     level = next;
     if (onProgress) onProgress(files.length, folders.size);
   }
-  return { root, folders, files, junk };
+  return { root, folders, files, junk, zips };
 }
 async function loadTree(onProgress) {
   const t = await fetchTree(onProgress);
   S.root = t.root; S.canEdit = !!(t.root.capabilities && t.root.capabilities.canAddChildren);
-  S.folders = t.folders; S.files = t.files; S.junk = t.junk;
+  S.folders = t.folders; S.files = t.files; S.junk = t.junk; S.zips = t.zips;
   collapseFicFolders();
   buildGroups();
 }
 const cacheKey = () => 'lib:' + userKey() + ':' + CONFIG.rootFolderId;
-const saveCache = (() => { let t; return () => { if (DEMO || !S.root) return; clearTimeout(t); t = setTimeout(() => idb.set(cacheKey(), { v: 1, at: Date.now(), root: S.root, canEdit: S.canEdit, folders: [...S.folders.values()], files: S.files, junk: S.junk, ficFolders: [...S.ficFolders.values()] }), 600); }; })();
+const saveCache = (() => { let t; return () => { if (DEMO || !S.root) return; clearTimeout(t); t = setTimeout(() => idb.set(cacheKey(), { v: 1, at: Date.now(), root: S.root, canEdit: S.canEdit, folders: [...S.folders.values()], files: S.files, junk: S.junk, zips: S.zips, ficFolders: [...S.ficFolders.values()] }), 600); }; })();
 function applySnapshot(c) {
   S.root = c.root; S.canEdit = c.canEdit;
-  S.folders = new Map(c.folders.map(f => [f.id, { ...f, name: decodeEntities(f.name) }])); S.files = c.files; S.junk = c.junk || [];
+  S.folders = new Map(c.folders.map(f => [f.id, { ...f, name: decodeEntities(f.name) }])); S.files = c.files; S.junk = c.junk || []; S.zips = c.zips || [];
   S.ficFolders = new Map((c.ficFolders || []).map(f => [f.id, f]));
   buildGroups();
 }
@@ -1078,6 +1080,8 @@ function renderMain() {
   }
   const unscanned = S.editing ? S.groups.filter(g => g.meta.guess && g.files.some(f => READABLE.includes(f.fmt))).length : 0;
   if (S.editing && S.junk.length && !q) h += `<div class="banner">${icon('trash')}<span>Found ${S.junk.length} hidden Mac system file${S.junk.length === 1 ? '' : 's'} (names starting with “._”) in your Drive folders. They’re not fics, and the site already ignores them. Clean them out of Drive?</span><button class="btn" data-act="clean-junk">Move to trash</button></div>`;
+  if (S.editing && S.zips.length && !q) { const mb = S.zips.reduce((a, z) => a + (+z.size || 0), 0) / 1048576;
+    h += `<div class="banner">${icon('trash')}<span>Found ${S.zips.length} .zip file${S.zips.length === 1 ? '' : 's'}${mb >= 1 ? ` (${Math.round(mb)} MB)` : ''} in your Drive folders. They don’t show on the site. Remove them from Drive?</span><button class="btn" data-act="clean-zips">Review &amp; remove</button></div>`; }
   if (unscanned) h += `<div class="banner">${icon('spark')}<span>${unscanned} fic${unscanned === 1 ? ' is' : 's are'} missing details (title, author, tags). Scan them once and everyone sees the full info.</span><button class="btn primary" data-act="scan-all">Scan now</button></div>`;
 
   if (isFolder && atRoot) {
@@ -1288,7 +1292,8 @@ async function importEntries(entries, base = S.current) {
   const clean = entries.filter(e => !isJunk(e.file.name) && !e.dirs.some(d => isJunk(d) || d === '__MACOSX'));
   const hidden = entries.length - clean.length;
   const ents = clean.filter(e => isFic({ name: e.file.name, mimeType: e.file.type }));
-  const unsupported = clean.length - ents.length;
+  const zipCount = clean.filter(e => /\.zip$/i.test(e.file.name)).length;
+  const unsupported = clean.length - ents.length - zipCount;
   if (!ents.length) { toast(hidden && !clean.length ? `Skipped ${hidden} hidden Mac system file${hidden === 1 ? '' : 's'}. Nothing else to upload.` : 'No fics found. Only .epub, .html, .pdf, .mobi and .azw3 files can be added.'); return; }
   // the chosen folder itself isn't a shelf: what's inside it goes into the shelf you're on
   if (ents.every(e => e.dirs.length && e.dirs[0] === ents[0].dirs[0])) ents.forEach(e => { e.dirs = e.dirs.slice(1); });
@@ -1342,7 +1347,7 @@ async function importEntries(entries, base = S.current) {
         + Object.entries(byShelf).map(([k, v]) => `• ${esc(k)}: ${v}`).join('<br>')
         + (newShelves.length ? `<br><br>New shelves: ${newShelves.map(p => '<b>' + esc(p.split('/').join(' › ')) + '</b>').join(', ')}` : '')
         + (already ? `<br><br>${already} already in your library: only missing formats will be added.` : '')
-        + (hidden || unsupported ? `<br><br>Skipping ${[hidden ? hidden + ' hidden Mac file' + (hidden === 1 ? '' : 's') : '', unsupported ? unsupported + ' other file' + (unsupported === 1 ? '' : 's') : ''].filter(Boolean).join(' and ')}.` : '')
+        + (hidden || unsupported || zipCount ? `<br><br>Skipping ${[zipCount ? zipCount + ' .zip file' + (zipCount === 1 ? '' : 's') : '', hidden ? hidden + ' hidden Mac file' + (hidden === 1 ? '' : 's') : '', unsupported ? unsupported + ' other file' + (unsupported === 1 ? '' : 's') : ''].filter(Boolean).join(', ')}.` : '')
     });
     if (!r) return;
   }
@@ -1486,6 +1491,18 @@ async function cleanJunk() {
   const worker = async () => { while (i < list.length) { const f = list[i++]; try { await S.store.trash(f.id); S.junk = S.junk.filter(x => x.id !== f.id); } catch (e) { failed++; if (e.auth) i = list.length; } done++; t.update(`Cleaning ${done} of ${list.length}…`); } };
   await Promise.all([worker(), worker(), worker(), worker()]);
   render(); t.done(`Moved ${done - failed} hidden file${done - failed === 1 ? '' : 's'} to Drive trash${failed ? ` · ${failed} couldn’t be removed (they may belong to someone else)` : ''}.`);
+}
+async function cleanZips() {
+  const list = S.zips.slice();
+  const where = z => { const f = S.folders.get(z.parent); return f && f.id !== S.root.id ? ` <span style="opacity:.6">(${esc(f.name)})</span>` : ''; };
+  const r = await dialog({ title: `Remove ${list.length} .zip file${list.length === 1 ? '' : 's'}?`, ok: 'Move to trash', danger: true,
+    text: `These will move to your Google Drive trash, where you can restore them for 30 days. Your fics (EPUB, HTML, PDF) aren’t touched.<br><br>${list.slice(0, 12).map(z => '• ' + esc(z.name) + where(z)).join('<br>')}${list.length > 12 ? `<br>…and ${list.length - 12} more` : ''}` });
+  if (!r) return;
+  const t = toast(`Removing 0 of ${list.length}…`, { sticky: true });
+  let done = 0, failed = 0, i = 0;
+  const worker = async () => { while (i < list.length) { const z = list[i++]; try { await S.store.trash(z.id); S.zips = S.zips.filter(x => x.id !== z.id); } catch (e) { failed++; if (e.auth) i = list.length; } done++; t.update(`Removing ${done} of ${list.length}…`); } };
+  await Promise.all([worker(), worker(), worker(), worker()]);
+  saveCache(); render(); t.done(`Moved ${done - failed} zip file${done - failed === 1 ? '' : 's'} to Drive trash${failed ? ` · ${failed} couldn’t be removed (they may belong to someone else)` : ''}.`);
 }
 async function scanAll() {
   const todo = S.groups.filter(g => g.meta.guess && g.files.some(f => READABLE.includes(f.fmt)));
@@ -1663,6 +1680,7 @@ document.addEventListener('click', async e => {
       case 'unresume': { e.stopPropagation(); const fid2 = actEl.dataset.file; const t = S.groupByFile.get(fid2)?.meta.t || 'Fic'; progress.set(fid2, { hidden: true }); renderMain();
         toast(`Removed “${t}” from Continue reading.`, { action: 'Undo', onAction: () => { progress.set(fid2, { hidden: false }); renderMain(); } }); break; }
       case 'clean-junk': cleanJunk(); break;
+      case 'clean-zips': cleanZips(); break;
       case 'close-modal': closeOverlay(); break;
       case 'read': openReader(fid); break;
       case 'download': download(fid); break;
@@ -1747,7 +1765,7 @@ async function refreshInBackground() {
     if (u) { S.user = u; ls.set('fanlib:lastUser', u); }
     const t = await fetchTree();
     S.root = t.root; S.canEdit = !!(t.root.capabilities && t.root.capabilities.canAddChildren);
-    S.folders = t.folders; S.files = t.files; S.junk = t.junk;
+    S.folders = t.folders; S.files = t.files; S.junk = t.junk; S.zips = t.zips;
     collapseFicFolders(); buildGroups();
     if (!S.folders.has(S.current)) S.current = S.root.id;
     S.editing = S.canEdit && auth.hasWrite();
